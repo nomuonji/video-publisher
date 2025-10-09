@@ -25,6 +25,7 @@ export interface ConceptConfig {
     gemini: string;
     youtube: string; // This might become legacy, for now we keep it.
     youtube_refresh_token?: string; // For server-side publishing
+    youtube_channel_id?: string;
     tiktok: string;
     instagram: string;
   };
