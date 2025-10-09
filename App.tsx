@@ -40,6 +40,7 @@ function App() {
     const [accessToken, setAccessToken] = useState<string | null>(null);
     
     const [concepts, setConcepts] = useState<Concept[]>([]);
+    const [instagramAccounts, setInstagramAccounts] = useState<any[]>([]);
     const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
     const [queuedVideos, setQueuedVideos] = useState<VideoFile[]>([]);
     const [postedVideos, setPostedVideos] = useState<VideoFile[]>([]);
@@ -108,17 +109,34 @@ function App() {
             window.google.accounts.oauth2.revoke(accessToken, () => {
                 setAccessToken(null);
                 setConcepts([]);
+                setInstagramAccounts([]);
                 setSelectedConceptId(null);
             });
         }
     };
+
+    const fetchInstagramAccounts = useCallback(async () => {
+        if ((!isSignedIn || !accessToken) && !isMockMode) return;
+        try {
+            // In mock mode, this would return a mock list
+            const accounts = await service.getInstagramAccounts(accessToken!);
+            setInstagramAccounts(accounts);
+        } catch (err: any) {
+            console.error("Error fetching Instagram accounts:", err);
+            // Non-fatal error, so just log it
+        }
+    }, [isSignedIn, accessToken, isMockMode, service]);
 
     const fetchConcepts = useCallback(async () => {
         if ((!isSignedIn || !accessToken) && !isMockMode) return;
         setIsLoadingConcepts(true);
         setError(null);
         try {
-            const fetchedConcepts = await service.listConceptFolders(accessToken!);
+            const [fetchedConcepts] = await Promise.all([
+                service.listConceptFolders(accessToken!),
+                fetchInstagramAccounts(), // Fetch instagram accounts alongside concepts
+            ]);
+
             setConcepts(fetchedConcepts);
             if (fetchedConcepts.length > 0 && !selectedConceptId) {
                  setSelectedConceptId(fetchedConcepts[0].googleDriveFolderId);
@@ -131,7 +149,7 @@ function App() {
         } finally {
             setIsLoadingConcepts(false);
         }
-    }, [isSignedIn, accessToken, isMockMode, service, selectedConceptId]);
+    }, [isSignedIn, accessToken, isMockMode, service, selectedConceptId, fetchInstagramAccounts]);
 
     const fetchVideos = useCallback(async () => {
         if (!selectedConcept || (!accessToken && !isMockMode)) {
@@ -208,7 +226,7 @@ function App() {
             setConcepts(concepts.map(c => 
                 c.googleDriveFolderId === selectedConceptId ? { ...c, name: newConfig.name, config: newConfig } : c
             ));
-            alert("Configuration saved successfully!");
+            // No alert on auto-save, it's disruptive.
         } catch (err: any) {
             console.error("Failed to save config:", err);
             setError(`Failed to save configuration: ${err.message}`);
@@ -302,7 +320,13 @@ function App() {
              <main className="flex-1 p-4 sm:p-6 lg:p-8 grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
                 <div className="xl:col-span-1 space-y-6">
                     {selectedConcept ? (
-                        <ConfigEditor conceptId={selectedConcept.googleDriveFolderId} conceptConfig={selectedConcept.config} onSave={handleSaveConfig} />
+                        <ConfigEditor 
+                            conceptId={selectedConcept.googleDriveFolderId} 
+                            conceptConfig={selectedConcept.config} 
+                            onSave={handleSaveConfig} 
+                            onRefresh={fetchConcepts} 
+                            instagramAccounts={instagramAccounts}
+                        />
                     ) : concepts.length > 0 ? (
                         <Card><p className="p-4 text-center text-slate-400">Please select a concept to begin.</p></Card>
                     ) : (

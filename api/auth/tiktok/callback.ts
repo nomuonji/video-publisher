@@ -9,13 +9,12 @@ dotenv.config({ path: '.env.local' });
 
 // --- Service Account Client for Drive ---
 const getServiceAccountAuth = () => {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set.');
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+    throw new Error('Google Service Account credentials are not set in environment variables.');
   }
-  const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   return new JWT({
-    email: serviceAccountKey.client_email,
-    key: serviceAccountKey.private_key,
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY,
     scopes: ['https://www.googleapis.com/auth/drive'],
   });
 };
@@ -57,10 +56,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // 1. Exchange code for TikTok access token
     const tokenEndpoint = 'https://open.tiktokapis.com/v2/oauth/token/';
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const proto = req.headers['x-forwarded-proto'] || 'http';
-    const redirectUri = `${proto}://${host}/api/auth/tiktok/callback`;
-
     const params = new URLSearchParams();
     params.append('client_key', process.env.TIKTOK_CLIENT_KEY!);
     params.append('client_secret', process.env.TIKTOK_CLIENT_SECRET!);
@@ -119,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).send(renderResponseScript('success', 'tiktok'));
 
   } catch (error: any) {
-    console.error('TikTok callback handler failed:', error);
+    console.error('TikTok callback handler failed:', error.message);
     res.setHeader('Content-Type', 'text/html');
     res.status(500).send(renderResponseScript('error', 'tiktok', error.message));
   }

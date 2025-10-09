@@ -1,5 +1,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config({ path: '.env.local' });
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const { conceptId } = req.query;

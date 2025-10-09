@@ -22,13 +22,12 @@ const getOAuth2Client = (req: VercelRequest) => {
 
 // --- Service Account Client for Drive ---
 const getServiceAccountAuth = () => {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set.');
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+    throw new Error('Google Service Account credentials are not set in environment variables.');
   }
-  const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   return new JWT({
-    email: serviceAccountKey.client_email,
-    key: serviceAccountKey.private_key,
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY,
     scopes: ['https://www.googleapis.com/auth/drive'],
   });
 };

@@ -9,9 +9,11 @@ interface ConfigEditorProps {
     conceptId: string;
     conceptConfig: ConceptConfig;
     onSave: (newConfig: ConceptConfig) => Promise<void>;
+    onRefresh: () => void;
+    instagramAccounts: any[];
 }
 
-export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptConfig, onSave }) => {
+export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptConfig, onSave, onRefresh, instagramAccounts }) => {
     const [config, setConfig] = useState<ConceptConfig>(conceptConfig);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -38,7 +40,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptCo
                     selectedPlatforms={config.platforms} 
                     setSelectedPlatforms={(platforms) => setConfig(c => ({ ...c, platforms }))}
                 />
-                <ApiConfig conceptId={conceptId} config={config} setConfig={setConfig} />
+                <ApiConfig 
+                    conceptId={conceptId} 
+                    config={config} 
+                    setConfig={setConfig} 
+                    onRefresh={onRefresh} 
+                    onSave={onSave} 
+                    instagramAccounts={instagramAccounts} 
+                />
             </div>
             <div className="mt-6 pt-6 border-t border-slate-700">
                 <button

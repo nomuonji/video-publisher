@@ -208,3 +208,22 @@ export const listVideos = async (accessToken: string, folderId: string): Promise
         webViewLink: file.webViewLink!,
     })) || [];
 };
+
+export const getInstagramAccounts = async (accessToken: string): Promise<any[]> => {
+    const parentFolderId = await getVStockFolderId(accessToken);
+    const url = `${DRIVE_API_URL}?q='${parentFolderId}' in parents and name='instagram_accounts.json' and trashed=false&fields=files(id)`;
+    const options = { headers: { 'Authorization': `Bearer ${accessToken}` } };
+    const data = await apiFetch(url, options);
+
+    if (data.files.length === 0) {
+        return []; // Return empty array if the file doesn't exist
+    }
+
+    const configFileId = data.files[0].id;
+    const configUrl = `${DRIVE_API_URL}/${configFileId}?alt=media`;
+    const configResponse = await fetch(configUrl, options);
+    if (!configResponse.ok) {
+        return [];
+    }
+    return configResponse.json();
+};

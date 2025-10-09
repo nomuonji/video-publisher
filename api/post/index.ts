@@ -1,5 +1,24 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { google } from 'googleapis';
+import { JWT } from 'google-auth-library';
+import dotenv from 'dotenv';
 import { uploadVideoToTiktok } from '../../services/tiktokService';
+import { postVideoToInstagram } from '../../services/instagramService';
+
+// Load environment variables
+dotenv.config({ path: '.env.local' });
+
+// --- Service Account Client for Drive ---
+const getServiceAccountAuth = () => {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+    throw new Error('Google Service Account credentials are not set in environment variables.');
+  }
+  return new JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -16,26 +35,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         console.log(`Received request to post video ${videoId} for concept ${conceptId}`);
 
-        // --- ここからが実際の投稿処理 ---
-
         // 1. Google認証のセットアップ (サービスアカウントを使用)
-        // const auth = await getGoogleAuth();
+        const serviceAuth = getServiceAccountAuth();
+        const drive = google.drive({ version: 'v3', auth: serviceAuth });
 
         // 2. conceptIdから設定ファイル(config.json)を読み込む
-        // const config = await getConceptConfig(auth, conceptId);
-        // Placeholder for config
-        const config = { 
-            platforms: { YouTube: true, TikTok: true, Instagram: false }, 
-            apiKeys: { tiktok: process.env.TIKTOK_ACCESS_TOKEN, youtube_refresh_token: '' }
-        };
+        const fileRes = await drive.files.list({
+            q: `'${conceptId}' in parents and name='config.json' and trashed=false`,
+            fields: 'files(id)',
+            pageSize: 1,
+        });
+
+        const configFile = fileRes.data.files?.[0];
+        if (!configFile || !configFile.id) {
+            throw new Error(`config.json not found for concept ${conceptId}`);
+        }
+
+        const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' });
+        const config = contentRes.data as any; // Using as any for simplicity
 
         // 3. videoIdを使ってGoogle Driveから動画ファイルをダウンロード
         // const videoFile = await downloadVideo(auth, videoId);
         console.log(`[Placeholder] Downloading video ${videoId}...`);
+        const videoUrl = 'https://www.example.com/video.mp4'; // Placeholder
 
         // 4. Gemini APIを使って投稿内容を生成
         // const content = await generateContentWithGemini(config.name);
         console.log(`[Placeholder] Generating content for concept...`);
+        const caption = "This is a great video!"; // Placeholder
 
         // 5. 各プラットフォームに投稿
         const platformsToPost = manualPlatforms || config.platforms;
@@ -43,28 +70,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (platformsToPost[platform]) {
                 console.log(`Posting to ${platform}...`);
                 if (platform === 'TikTok') {
-                    // In a real app, you'd get these from a user-specific database record
-                    const tiktokTokenInfo = JSON.parse(config.apiKeys.tiktok || '{}');
-                    const accessToken = tiktokTokenInfo.access_token;
-                    const openId = tiktokTokenInfo.open_id;
-
-                    if (!accessToken || !openId) {
+                    if (!config.apiKeys.tiktok) {
                         console.error('TikTok credentials not found in config.');
-                        continue; // Skip to next platform
+                        continue;
                     }
-
-                    // This URL should point to the video file downloaded from Google Drive
-                    const videoUrl = 'https://www.example.com/video.mp4'; // Placeholder
-
                     try {
-                        const result = await uploadVideoToTiktok({ accessToken, openId, videoUrl });
-                        console.log(`Successfully initiated TikTok upload. Publish ID: ${result.publish_id}`);
+                        const tiktokTokenInfo = JSON.parse(config.apiKeys.tiktok);
+                        const accessToken = tiktokTokenInfo.access_token;
+                        const openId = tiktokTokenInfo.open_id;
+                        if (!accessToken || !openId) throw new Error('TikTok token data is incomplete.');
+                        
+                        await uploadVideoToTiktok({ accessToken, openId, videoUrl });
+
                     } catch (error) {
                         console.error(`Failed to post to TikTok:`, error);
                     }
+                } else if (platform === 'Instagram') {
+                    const selectedAccountId = config.apiKeys.instagram;
+                    if (!selectedAccountId) {
+                        console.error('No Instagram account selected for this concept.');
+                        continue;
+                    }
+                    try {
+                        // Fetch the global list of accounts
+                        const accountsFileRes = await drive.files.list({
+                            q: `name='instagram_accounts.json' and trashed=false`,
+                            spaces: 'drive',
+                            fields: 'files(id)',
+                            pageSize: 1,
+                        });
+                        const accountsFile = accountsFileRes.data.files?.[0];
+                        if (!accountsFile || !accountsFile.id) {
+                            throw new Error('instagram_accounts.json not found.');
+                        }
+                        const accountsContentRes = await drive.files.get({ fileId: accountsFile.id, alt: 'media' });
+                        const allIgAccounts = accountsContentRes.data as any[];
+
+                        const accountToUse = allIgAccounts.find(acc => acc.id === selectedAccountId);
+                        if (!accountToUse) {
+                            throw new Error(`Selected Instagram account with ID ${selectedAccountId} not found in global list.`);
+                        }
+
+                        const accessToken = accountToUse.page_access_token;
+                        const instagramAccountId = accountToUse.id;
+
+                        await postVideoToInstagram({ accessToken, instagramAccountId, videoUrl, caption });
+
+                    } catch (error) {
+                        console.error(`Failed to post to Instagram:`, error);
+                    }
                 } else {
                     console.log(`[Placeholder] Posting to ${platform}...`);
-                    // await postToPlatform(platform, videoFile, content);
                 }
             }
         }
@@ -80,6 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (error: any) {
         console.error('Error in /api/post:', error);
-        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
+        // Return a more descriptive error to the client
+        res.status(500).json({ error: 'Internal Server Error', details: error.message });
     }
 }
