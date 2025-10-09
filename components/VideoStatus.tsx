@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import type { VideoFile } from '../types';
+import type { VideoFile, ConceptConfig } from '../types';
 import { SpinnerIcon } from './icons/UtilityIcons';
 import { Card } from './Card';
+import { VideoPostDetailsEditor } from './VideoPostDetailsEditor';
 
 interface VideoStatusProps {
   queuedVideos: VideoFile[];
@@ -9,6 +10,8 @@ interface VideoStatusProps {
   isLoading: boolean;
   onInitiatePost: (videoId: string) => void;
   postingVideoId: string | null;
+  conceptDefaultPostDetails: ConceptConfig['postDetails'];
+  onUpdateVideoPostDetails: (videoId: string, postDetails: ConceptConfig['postDetails']) => Promise<void>;
 }
 
 type Tab = 'Queued' | 'Posted';
@@ -18,9 +21,11 @@ interface VideoListProps {
     showPostButton: boolean;
     onPost?: (videoId: string) => void;
     postingVideoId: string | null;
+    onEditPostDetails: (video: VideoFile) => void;
+    conceptDefaultPostDetails: ConceptConfig['postDetails'];
 }
 
-const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, postingVideoId }) => {
+const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, postingVideoId, onEditPostDetails, conceptDefaultPostDetails }) => {
     if (videos.length === 0) {
         return <p className="text-center text-slate-400 py-8">No videos in this list.</p>;
     }
@@ -28,6 +33,10 @@ const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, p
         <div className="space-y-3">
             {videos.map(video => {
                 const isCurrentlyPosting = postingVideoId === video.id;
+                // Ensure conceptDefaultPostDetails is always an object
+                const safeConceptDefaultPostDetails = conceptDefaultPostDetails || { title: '', description: '', hashtags: '', aiLabel: false };
+                const effectivePostDetails = video.postDetailsOverride || safeConceptDefaultPostDetails;
+
                 return (
                     <div
                         key={video.id}
@@ -44,10 +53,26 @@ const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, p
                                 alt={video.name} 
                                 className="w-24 h-16 object-cover rounded-md mr-4 flex-shrink-0 bg-slate-800" 
                             />
-                            <span className="text-sm text-slate-200 truncate" title={video.name}>
-                                {video.name}
-                            </span>
+                            <div className="flex-grow">
+                                <span className="text-sm text-slate-200 truncate block" title={effectivePostDetails.title}>
+                                    {effectivePostDetails.title}
+                                </span>
+                                <span className="text-xs text-slate-400 truncate block" title={effectivePostDetails.description}>
+                                    {effectivePostDetails.description}
+                                </span>
+                                {effectivePostDetails.hashtags && (
+                                    <span className="text-xs text-indigo-300 truncate block" title={effectivePostDetails.hashtags}>
+                                        {effectivePostDetails.hashtags}
+                                    </span>
+                                )}
+                            </div>
                         </a>
+                        <button
+                            onClick={() => onEditPostDetails(video)}
+                            className="ml-2 px-3 py-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 rounded-md border border-indigo-400 hover:border-indigo-300 transition-colors"
+                        >
+                            Edit Details
+                        </button>
                         {showPostButton && onPost && (
                             <button
                                 onClick={() => onPost(video.id)}
@@ -64,8 +89,25 @@ const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, p
     );
 };
 
-export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVideos, isLoading, onInitiatePost, postingVideoId }) => {
+export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVideos, isLoading, onInitiatePost, postingVideoId, conceptDefaultPostDetails, onUpdateVideoPostDetails }) => {
   const [activeTab, setActiveTab] = useState<Tab>('Queued');
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [videoToEdit, setVideoToEdit] = useState<VideoFile | null>(null);
+
+  const handleEditPostDetails = (video: VideoFile) => {
+    setVideoToEdit(video);
+    setIsEditorOpen(true);
+  };
+
+  const handleCloseEditor = () => {
+    setIsEditorOpen(false);
+    setVideoToEdit(null);
+  };
+
+  const handleSavePostDetails = async (videoId: string, postDetails: ConceptConfig['postDetails']) => {
+    await onUpdateVideoPostDetails(videoId, postDetails);
+    handleCloseEditor();
+  };
 
   return (
     <Card className="h-full flex flex-col">
@@ -103,11 +145,21 @@ export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVi
             </div>
         ) : (
             <>
-              {activeTab === 'Queued' && <VideoList videos={queuedVideos} showPostButton={true} onPost={onInitiatePost} postingVideoId={postingVideoId} />}
-              {activeTab === 'Posted' && <VideoList videos={postedVideos} showPostButton={false} postingVideoId={null} />}
+              {activeTab === 'Queued' && <VideoList videos={queuedVideos} showPostButton={true} onPost={onInitiatePost} postingVideoId={postingVideoId} onEditPostDetails={handleEditPostDetails} />}
+              {activeTab === 'Posted' && <VideoList videos={postedVideos} showPostButton={false} postingVideoId={null} onEditPostDetails={handleEditPostDetails} />}
             </>
         )}
       </div>
+
+      {videoToEdit && (
+        <VideoPostDetailsEditor
+          isOpen={isEditorOpen}
+          onClose={handleCloseEditor}
+          onSave={handleSavePostDetails}
+          video={videoToEdit}
+          conceptDefaultPostDetails={conceptDefaultPostDetails}
+        />
+      )}
     </Card>
   );
 };

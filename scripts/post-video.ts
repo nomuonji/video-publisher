@@ -101,7 +101,8 @@ export async function performVideoPosting(
   conceptId: string,
   serviceAccountJson: string,
   targetVideoId?: string, // Optional: for manual posting of a specific video
-  targetPlatforms?: { YouTube?: boolean; TikTok?: boolean; Instagram?: boolean } // Optional: for manual posting to specific platforms
+  targetPlatforms?: { YouTube?: boolean; TikTok?: boolean; boolean; Instagram?: boolean }, // Optional: for manual posting to specific platforms
+  postDetailsOverride?: ConceptConfig['postDetails'] // Add this
 ) {
   console.log(`[performVideoPosting] Starting for concept: ${conceptId}`);
 
@@ -165,14 +166,19 @@ export async function performVideoPosting(
     // TODO: Add other context variables as needed (e.g., youtube_link, description_from_drive, hashtags_from_drive)
   };
 
+  // Determine effective post details (override if present, else concept default)
+  const effectivePostDetails = videoToPost.postDetailsOverride || config.postDetails;
+
   // Generate title, description, hashtags
-  const title = formatString(config.postDetails.title.format || config.postDetails.title.default, formatContext);
-  const description = formatString(config.postDetails.description.format || config.postDetails.description.default, formatContext);
-  const hashtags = formatString(config.postDetails.hashtags.format || config.postDetails.hashtags.default, formatContext);
+  const title = effectivePostDetails.title;
+  const description = effectivePostDetails.description;
+  const hashtags = effectivePostDetails.hashtags;
+  const aiLabel = effectivePostDetails.aiLabel; // Get AI label
 
   console.log(`[performVideoPosting] Generated Title: ${title}`);
   console.log(`[performVideoPosting] Generated Description: ${description}`);
   console.log(`[performVideoPosting] Generated Hashtags: ${hashtags}`);
+  console.log(`[performVideoPosting] AI Label: ${aiLabel}`);
 
   // 4. Authenticate with platforms and post
   const platformsToPost = targetPlatforms || config.platforms;
@@ -255,7 +261,7 @@ export async function performVideoPosting(
             description: description + (hashtags ? `\n\n${hashtags}` : ''), // Append hashtags to description
             visibility_type: 'SELF_ONLY', // or 'PUBLIC', 'FRIENDS_ONLY', get from config
             // brand_content_toggle: false,
-            ai_generated_content: config.postDetails.aiLabel, // Add AI label
+            ai_generated_content: aiLabel, // Add AI label
           },
           source_info: {
             source: 'PULL_FROM_URL', // Or 'UPLOAD_LOCAL_FILE'
@@ -344,7 +350,7 @@ export async function performVideoPosting(
           media_type: 'VIDEO',
           video_url: videoUrl, // Use webContentLink for direct upload from Drive
           caption: `${title}\n${description}\n${hashtags}`,
-          is_ai_generated: config.postDetails.aiLabel, // Add AI label
+          is_ai_generated: aiLabel, // Add AI label
         }),
       });
       const uploadData = await uploadResponse.json();

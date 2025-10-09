@@ -226,6 +226,19 @@ function App() {
         }
     };
 
+    const handleUpdateVideoPostDetails = async (videoId: string, postDetails: ConceptConfig['postDetails']) => {
+        if (!accessToken) return;
+        try {
+            await service.updateVideoPostDetails(accessToken!, videoId, postDetails);
+            // After updating, refresh videos to show the new override
+            fetchVideos();
+        } catch (err: any) {
+            console.error("Failed to update video post details:", err);
+            setError(`Failed to update video post details: ${err.message}`);
+            alert(`Error: Failed to update video post details. ${err.message}`);
+        }
+    };
+
     const handleInitiatePost = (videoId: string) => {
         const video = queuedVideos.find(v => v.id === videoId);
         if (video) {
@@ -251,6 +264,8 @@ function App() {
                     videoId: videoToPost.id,
                     conceptId: selectedConcept.googleDriveFolderId,
                     platforms: platforms,
+                    // Pass postDetailsOverride if it exists for this video
+                    postDetailsOverride: videoToPost.postDetailsOverride,
                 }),
             });
 
@@ -328,6 +343,8 @@ function App() {
                                 isLoading={isLoadingVideos}
                                 onInitiatePost={handleInitiatePost}
                                 postingVideoId={isPosting}
+                                conceptDefaultPostDetails={selectedConcept.config.postDetails || { title: '', description: '', hashtags: '', aiLabel: false }}
+                                onUpdateVideoPostDetails={handleUpdateVideoPostDetails}
                             />
                         </>
                     ) : (

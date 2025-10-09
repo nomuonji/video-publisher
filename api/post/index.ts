@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { videoId, conceptId, platforms } = req.body;
+  const { videoId, conceptId, platforms, postDetailsOverride } = req.body;
 
   if (!videoId || !conceptId || !platforms) {
     return res.status(400).json({ error: 'Missing videoId, conceptId, or platforms in request body.' });
@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await serviceAccountAuth.authorize(); // Ensure token is fetched
 
     // Call the reusable posting logic
-    await performVideoPosting(conceptId, process.env.GOOGLE_SERVICE_ACCOUNT_JSON!, videoId, platforms);
+    await performVideoPosting(conceptId, process.env.GOOGLE_SERVICE_ACCOUNT_JSON!, videoId, platforms, postDetailsOverride);
 
     res.status(200).json({ message: 'Posting process initiated successfully.' });
   } catch (error: any) {

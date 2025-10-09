@@ -225,16 +225,44 @@ export const updateConceptConfig = async (accessToken: string, conceptId: string
 };
 
 export const listVideos = async (accessToken: string, folderId: string): Promise<VideoFile[]> => {
-    const url = `${DRIVE_API_URL}?q='${folderId}' in parents and mimeType contains 'video/' and trashed=false&fields=files(id, name, thumbnailLink, webViewLink)&pageSize=100`;
+    const url = `${DRIVE_API_URL}?q='${folderId}' in parents and mimeType contains 'video/' and trashed=false&fields=files(id, name, thumbnailLink, webViewLink, properties)&pageSize=100`; // Add 'properties' field
     const options = { headers: { 'Authorization': `Bearer ${accessToken}` } };
     const data = await apiFetch(url, options);
 
-    return data.files?.map((file: any) => ({
-        id: file.id!,
-        name: file.name!,
-        thumbnailLink: file.thumbnailLink!,
-        webViewLink: file.webViewLink!,
-    })) || [];
+    return data.files?.map((file: any) => {
+        let postDetailsOverride = undefined;
+        if (file.properties && file.properties.postDetailsOverride) {
+            try {
+                postDetailsOverride = JSON.parse(file.properties.postDetailsOverride);
+            } catch (e) {
+                console.error(`Error parsing postDetailsOverride for video ${file.id}:`, e);
+            }
+        }
+        return {
+            id: file.id!,
+            name: file.name!,
+            thumbnailLink: file.thumbnailLink!,
+            webViewLink: file.webViewLink!,
+            postDetailsOverride: postDetailsOverride, // Add this
+        };
+    }) || [];
+};
+
+export const updateVideoPostDetails = async (accessToken: string, videoId: string, postDetails: ConceptConfig['postDetails']): Promise<void> => {
+    const url = `${DRIVE_API_URL}/${videoId}`;
+    const options = {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            properties: {
+                postDetailsOverride: JSON.stringify(postDetails), // Store as JSON string
+            },
+        }),
+    };
+    await apiFetch(url, options);
 };
 
 export const getInstagramAccounts = async (accessToken: string): Promise<any[]> => {

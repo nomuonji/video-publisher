@@ -6,6 +6,7 @@ export interface VideoFile {
   name: string;
   thumbnailLink?: string; // Thumbnails might not always be available
   webViewLink: string;
+  postDetailsOverride?: ConceptConfig['postDetails'];
 }
 
 export interface TikTokTokens {
