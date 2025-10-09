@@ -136,7 +136,18 @@ export const createConcept = async (accessToken: string, name: string): Promise<
       name: name,
       schedule: '0 8 * * *',
       platforms: { YouTube: true, TikTok: true, Instagram: false },
-      apiKeys: { gemini: '', youtube: '', tiktok: '', instagram: '' }
+      apiKeys: {
+        tiktok: {
+          access_token: '',
+          expires_in: 0,
+          open_id: '',
+          refresh_expires_in: 0,
+          refresh_token: '',
+          scope: '',
+          token_type: '',
+        },
+        instagram: '',
+      }
     };
 
     await createConfigFile(accessToken, defaultConfig, conceptFolderId);

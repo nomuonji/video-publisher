@@ -8,6 +8,16 @@ export interface VideoFile {
   webViewLink: string;
 }
 
+export interface TikTokTokens {
+  access_token: string;
+  expires_in: number;
+  open_id: string;
+  refresh_expires_in: number;
+  refresh_token: string;
+  scope: string;
+  token_type: string;
+}
+
 // Represents the platforms selected for posting
 export interface SelectedPlatforms {
   YouTube: boolean;
@@ -21,15 +31,12 @@ export interface ConceptConfig {
   name: string;
   schedule: string; // e.g., '0 8 * * *' (cron format)
   platforms: SelectedPlatforms;
-  apiKeys: {
-    gemini: string;
-    youtube: string; // This might become legacy, for now we keep it.
-    youtube_refresh_token?: string; // For server-side publishing
-    youtube_channel_id?: string;
-    tiktok: string;
-    instagram: string;
-  };
-}
+      apiKeys: {
+      youtube_refresh_token?: string; // For server-side publishing
+      youtube_channel_id?: string;
+      tiktok: TikTokTokens;
+      instagram: string;
+    };}
 
 // Represents a full concept, which is a folder in Google Drive
 export interface Concept {

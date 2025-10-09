@@ -90,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...currentConfig,
         apiKeys: {
             ...currentConfig.apiKeys,
-            tiktok: JSON.stringify(tiktokTokens), // Store the full token object as a string
+            tiktok: tiktokTokens, // Store the full token object directly
         }
     };
 

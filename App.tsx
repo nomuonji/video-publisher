@@ -310,23 +310,6 @@ function App() {
 
         return (
              <main className="flex-1 p-4 sm:p-6 lg:p-8 grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-                <div className="xl:col-span-1 space-y-6">
-                    {selectedConcept ? (
-                        <ConfigEditor 
-                            conceptId={selectedConcept.googleDriveFolderId} 
-                            conceptConfig={selectedConcept.config} 
-                            onSave={handleSaveConfig} 
-                            onRefresh={fetchConcepts} 
-                            instagramAccounts={instagramAccounts}
-                            accessToken={accessToken}
-                        />
-                    ) : concepts.length > 0 ? (
-                        <Card><p className="p-4 text-center text-slate-400">Please select a concept to begin.</p></Card>
-                    ) : (
-                        <Instructions />
-                    ) }
-                </div>
-
                 <div className="xl:col-span-2 space-y-6">
                      {selectedConcept ? (
                         <>
@@ -358,8 +341,23 @@ function App() {
                          </Card>
                     ) }
                 </div>
-            </main>
-        );
+                <div className="xl:col-span-1 space-y-6">
+                    {selectedConcept ? (
+                        <ConfigEditor 
+                            conceptId={selectedConcept.googleDriveFolderId} 
+                            conceptConfig={selectedConcept.config} 
+                            onSave={handleSaveConfig} 
+                            onRefresh={fetchConcepts} 
+                            instagramAccounts={instagramAccounts}
+                            accessToken={accessToken}
+                        />
+                    ) : concepts.length > 0 ? (
+                        <Card><p className="p-4 text-center text-slate-400">Please select a concept to begin.</p></Card>
+                    ) : (
+                        <Instructions />
+                    ) }
+                </div>
+            </main>        );
     };
 
     return (
