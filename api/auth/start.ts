@@ -18,10 +18,13 @@ const getOAuth2Client = (req: VercelRequest) => {
 };
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
-  const { conceptId } = req.query;
+  const { conceptId, accessToken } = req.query;
 
   if (!conceptId || typeof conceptId !== 'string') {
     return res.status(400).send('Concept ID is required.');
+  }
+  if (!accessToken || typeof accessToken !== 'string') {
+    return res.status(400).send('Google Access Token is required.');
   }
 
   const oauth2Client = getOAuth2Client(req);
@@ -33,7 +36,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       'https://www.googleapis.com/auth/youtube',
       'https://www.googleapis.com/auth/drive.readonly' // Scope for reading config
     ],
-    state: JSON.stringify({ conceptId }), // Pass conceptId through the state
+    state: JSON.stringify({ conceptId, accessToken }), // Pass conceptId and accessToken through the state
   });
 
   res.redirect(302, authUrl);

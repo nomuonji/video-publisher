@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import type { ConceptConfig } from '../types';
-import { TextInput } from './TextInput';
+
 
 interface ApiConfigProps {
     conceptId: string;
@@ -39,8 +39,20 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
         window.open(url, '_blank', `width=${width},height=${height},top=${top},left=${left}`);
     };
 
-    const handleConnectYouTube = () => openAuthPopup(`/api/auth/start?conceptId=${conceptId}`);
-    const handleConnectTikTok = () => openAuthPopup(`/api/auth/tiktok/start?conceptId=${conceptId}`);
+    const handleConnectYouTube = () => {
+        if (!accessToken) {
+            alert("Authentication error: Google access token is missing.");
+            return;
+        }
+        openAuthPopup(`/api/auth/start?conceptId=${conceptId}&accessToken=${accessToken}`);
+    };
+    const handleConnectTikTok = () => {
+        if (!accessToken) {
+            alert("Authentication error: Google access token is missing.");
+            return;
+        }
+        openAuthPopup(`/api/auth/tiktok/start?conceptId=${conceptId}&accessToken=${accessToken}`);
+    };
     const handleConnectInstagram = () => {
         if (!accessToken) {
             alert("Authentication error: Google access token is missing.");

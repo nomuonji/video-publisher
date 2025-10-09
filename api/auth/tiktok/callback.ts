@@ -1,30 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import fetch from 'node-fetch';
 import { google } from 'googleapis';
-import { JWT } from 'google-auth-library';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
-
-// --- Service Account Client for Drive ---
-const getServiceAccountAuth = () => {
-  console.log('[getServiceAccountAuth] ENTERED');
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_PRIVATE_KEY;
-  console.log(`[getServiceAccountAuth] Email defined: ${!!email}, Key defined: ${!!key}`);
-  if (!email || !key) {
-    throw new Error('Google Service Account credentials are not set in environment variables.');
-  }
-  console.log('[getServiceAccountAuth] ABOUT TO CALL new JWT()');
-  const jwt = new JWT({
-    email: email,
-    key: key,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-  console.log('[getServiceAccountAuth] new JWT() SUCCEEDED');
-  return jwt;
-};
 
 const renderResponseScript = (status: 'success' | 'error', service: string, message?: string) => `
   <!DOCTYPE html>
@@ -50,19 +32,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).send('State is missing.');
   }
 
-  let conceptId: string;
   try {
-    conceptId = JSON.parse(state).conceptId;
+    const { conceptId, accessToken } = JSON.parse(state);
     if (!conceptId) {
       throw new Error('Concept ID not found in state.');
     }
-  } catch (error) {
-    return res.status(400).send('Invalid state format.');
-  }
+    if (!accessToken) {
+      throw new Error('Google Access Token not found in state.');
+    }
 
-  try {
     // 1. Exchange code for TikTok access token
     const tokenEndpoint = 'https://open.tiktokapis.com/v2/oauth/token/';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const redirectUri = `${proto}://${host}/api/auth/tiktok/callback`;
+
     const params = new URLSearchParams();
     params.append('client_key', process.env.TIKTOK_CLIENT_KEY!);
     params.append('client_secret', process.env.TIKTOK_CLIENT_SECRET!);
@@ -81,9 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error(`TikTok token exchange failed: ${tiktokTokens.error_description || 'Unknown error'}`);
     }
 
-    // 2. Use service account to update config.json on Google Drive
-    const serviceAuth = getServiceAccountAuth();
-    const drive = google.drive({ version: 'v3', auth: serviceAuth });
+    // 2. Use user's Google token to update config.json on Google Drive
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
     const fileRes = await drive.files.list({
         q: `'${conceptId}' in parents and name='config.json' and trashed=false`,
@@ -96,8 +81,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw new Error(`config.json not found for concept ${conceptId}`);
     }
 
-    const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' });
-    const currentConfig = contentRes.data as any; // Cast to any to avoid type issues with dynamic config
+    // We need to specify responseType: 'json' when getting file content with googleapis
+    const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' }, { responseType: 'json' });
+    const currentConfig = contentRes.data as any;
 
     // Update config with the new TikTok tokens
     const newConfig = {
@@ -122,6 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('TikTok callback handler failed:', error.message);
+    if (error.stack) {
+        console.error(error.stack);
+    }
     res.setHeader('Content-Type', 'text/html');
     res.status(500).send(renderResponseScript('error', 'tiktok', error.message));
   }

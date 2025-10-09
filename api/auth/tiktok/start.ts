@@ -6,10 +6,13 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
-  const { conceptId } = req.query;
+  const { conceptId, accessToken } = req.query;
 
   if (!conceptId || typeof conceptId !== 'string') {
     return res.status(400).send('Concept ID is required.');
+  }
+  if (!accessToken || typeof accessToken !== 'string') {
+    return res.status(400).send('Google Access Token is required.');
   }
 
   const clientId = process.env.TIKTOK_CLIENT_KEY;
@@ -21,7 +24,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const responseType = 'code';
   
   // Use a JSON string for the state to pass multiple values if needed
-  const state = JSON.stringify({ conceptId });
+  const state = JSON.stringify({ conceptId, accessToken });
 
   const url = `https://www.tiktok.com/v2/auth/authorize?client_key=${clientId}&scope=${scope}&response_type=${responseType}&redirect_uri=${redirectUri}&state=${encodeURIComponent(state)}`;
 

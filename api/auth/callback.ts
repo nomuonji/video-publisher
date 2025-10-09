@@ -2,7 +2,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
-import { JWT } from 'google-auth-library';
 
 // --- OAuth Client for User ---
 const getOAuth2Client = (req: VercelRequest) => {
@@ -17,27 +16,6 @@ const getOAuth2Client = (req: VercelRequest) => {
   );
 };
 
-// --- Service Account Client for Drive ---
-const getServiceAccountAuth = () => {
-  const serviceAccountJSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJSON) {
-    throw new Error('The GOOGLE_SERVICE_ACCOUNT_JSON environment variable is not set.');
-  }
-
-  try {
-    const credentials = JSON.parse(serviceAccountJSON);
-    const jwt = new JWT({
-      email: credentials.client_email,
-      key: credentials.private_key,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
-    return jwt;
-  } catch (error: any) {
-    throw new Error(`Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON: ${error.message}`);
-  }
-};
-
-
 // --- Main Handler ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code, state } = req.query;
@@ -50,23 +28,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { conceptId } = JSON.parse(state);
+    const { conceptId, accessToken } = JSON.parse(state);
     if (!conceptId) {
       return res.status(400).send('Concept ID not found in state.');
     }
+    if (!accessToken) {
+      return res.status(400).send('Google Access Token not found in state.');
+    }
 
-    // 1. Exchange code for refresh token
-    const oauth2Client = getOAuth2Client(req);
-    const { tokens } = await oauth2Client.getToken(code);
+    // 1. Exchange code for refresh token (using the client for YouTube auth)
+    const youtubeOAuth2Client = getOAuth2Client(req);
+    const { tokens } = await youtubeOAuth2Client.getToken(code);
     const refreshToken = tokens.refresh_token;
 
     if (!refreshToken) {
       throw new Error('Refresh token not granted. Please ensure you are providing consent.');
     }
 
-    // 2. Use service account to update config.json on Google Drive
-    const serviceAuth = getServiceAccountAuth();
-    const drive = google.drive({ version: 'v3', auth: serviceAuth });
+    // 2. Use user's Google token (from state) to update config.json on Google Drive
+    const driveOAuth2Client = new google.auth.OAuth2();
+    driveOAuth2Client.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth: driveOAuth2Client });
 
     // Find the config.json file for the concept
     const fileRes = await drive.files.list({
@@ -80,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get current config content
-    const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' });
+    const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' }, { responseType: 'json' });
     const currentConfig = contentRes.data;
 
     // Update config with the new refresh token
