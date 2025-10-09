@@ -1,7 +1,7 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Concept, ConceptConfig, VideoFile, SelectedPlatforms } from './types';
 import * as driveService from './services/googleDriveService';
-import * as mockDriveService from './services/mockGoogleDriveService';
 import { Header } from './components/Header';
 import { Instructions } from './components/Instructions';
 import { Card } from './components/Card';
@@ -25,14 +25,6 @@ declare global {
     }
 }
 
-const useMockMode = () => {
-    const [isMock, setIsMock] = useState(false);
-    useEffect(() => {
-        const queryParams = new URLSearchParams(window.location.search);
-        setIsMock(queryParams.get('mock') === 'true');
-    }, []);
-    return isMock;
-};
 
 function App() {
     const [isGisLoaded, setIsGisLoaded] = useState(false);
@@ -53,8 +45,7 @@ function App() {
     const [videoToPost, setVideoToPost] = useState<VideoFile | null>(null);
 
     const isSignedIn = !!accessToken;
-    const isMockMode = useMockMode();
-    const service = useMemo(() => (isMockMode ? mockDriveService : driveService), [isMockMode]);
+    const service = driveService;
 
     const selectedConcept = useMemo(() => {
         return concepts.find(c => c.googleDriveFolderId === selectedConceptId) || null;
@@ -116,25 +107,23 @@ function App() {
     };
 
     const fetchInstagramAccounts = useCallback(async () => {
-        if ((!isSignedIn || !accessToken) && !isMockMode) return;
+        if (!isSignedIn || !accessToken) return;
         try {
-            // In mock mode, this would return a mock list
             const accounts = await service.getInstagramAccounts(accessToken!);
             setInstagramAccounts(accounts);
         } catch (err: any) {
             console.error("Error fetching Instagram accounts:", err);
-            // Non-fatal error, so just log it
         }
-    }, [isSignedIn, accessToken, isMockMode, service]);
+    }, [isSignedIn, accessToken, service]);
 
     const fetchConcepts = useCallback(async () => {
-        if ((!isSignedIn || !accessToken) && !isMockMode) return;
+        if (!isSignedIn || !accessToken) return;
         setIsLoadingConcepts(true);
         setError(null);
         try {
             const [fetchedConcepts] = await Promise.all([
                 service.listConceptFolders(accessToken!),
-                fetchInstagramAccounts(), // Fetch instagram accounts alongside concepts
+                fetchInstagramAccounts(),
             ]);
 
             setConcepts(fetchedConcepts);
@@ -149,10 +138,10 @@ function App() {
         } finally {
             setIsLoadingConcepts(false);
         }
-    }, [isSignedIn, accessToken, isMockMode, service, selectedConceptId, fetchInstagramAccounts]);
+    }, [isSignedIn, accessToken, service, selectedConceptId, fetchInstagramAccounts]);
 
     const fetchVideos = useCallback(async () => {
-        if (!selectedConcept || (!accessToken && !isMockMode)) {
+        if (!selectedConcept || !accessToken) {
             setQueuedVideos([]);
             setPostedVideos([]);
             return;
@@ -171,13 +160,13 @@ function App() {
         } finally {
             setIsLoadingVideos(false);
         }
-    }, [selectedConcept, service, accessToken, isMockMode]);
+    }, [selectedConcept, service, accessToken]);
 
     useEffect(() => {
-        if (isSignedIn || isMockMode) {
+        if (isSignedIn) {
             fetchConcepts();
         }
-    }, [isSignedIn, isMockMode, fetchConcepts]);
+    }, [isSignedIn, fetchConcepts]);
 
     useEffect(() => {
         if (selectedConcept) {
@@ -190,7 +179,7 @@ function App() {
     };
 
     const handleCreateConcept = async () => {
-        if (!accessToken && !isMockMode) return;
+        if (!accessToken) return;
         const newName = prompt("Enter a name for the new concept:");
         if (newName && newName.trim() !== '') {
             try {
@@ -204,7 +193,7 @@ function App() {
     };
 
     const handleDeleteConcept = async (concept: Concept) => {
-        if (!accessToken && !isMockMode) return;
+        if (!accessToken) return;
         if (window.confirm(`Are you sure you want to delete the concept "${concept.name}"? This cannot be undone.`)) {
             try {
                 await service.deleteConcept(accessToken!, concept.googleDriveFolderId);
@@ -220,13 +209,12 @@ function App() {
     };
 
     const handleSaveConfig = async (newConfig: ConceptConfig) => {
-        if (!selectedConcept || (!accessToken && !isMockMode)) return;
+        if (!selectedConcept || !accessToken) return;
         try {
             await service.updateConceptConfig(accessToken!, selectedConcept.googleDriveFolderId, newConfig);
             setConcepts(concepts.map(c => 
                 c.googleDriveFolderId === selectedConceptId ? { ...c, name: newConfig.name, config: newConfig } : c
             ));
-            // No alert on auto-save, it's disruptive.
         } catch (err: any) {
             console.error("Failed to save config:", err);
             setError(`Failed to save configuration: ${err.message}`);
@@ -282,7 +270,7 @@ function App() {
     };
 
     const renderContent = () => {
-        if (!isMockMode && !isSignedIn) {
+        if (!isSignedIn) {
             return (
                 <div className="flex-grow flex items-center justify-center">
                     <Card>
@@ -367,13 +355,13 @@ function App() {
                 </div>
             </main>
         );
-    }
+    };
 
     return (
         <div className="bg-slate-900 text-slate-200 min-h-screen flex flex-col">
-            <Header isSignedIn={isSignedIn} onSignIn={handleSignIn} onSignOut={handleSignOut} isMockMode={isMockMode} />
+            <Header isSignedIn={isSignedIn} onSignIn={handleSignIn} onSignOut={handleSignOut} />
             <div className="flex-1 flex max-w-screen-2xl mx-auto w-full overflow-y-hidden">
-                {(isSignedIn || isMockMode) && (
+                {isSignedIn && (
                     <aside className="w-72 flex-shrink-0 p-4 sm:p-6 border-r border-slate-700/50 flex flex-col">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-bold text-slate-100">Concepts</h2>

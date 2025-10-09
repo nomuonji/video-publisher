@@ -1,27 +1,24 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { JWT } from 'google-auth-library';
-import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
 
 const getServiceAccountAuth = () => {
-  console.log('[getServiceAccountAuth] ENTERED');
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_PRIVATE_KEY;
-  console.log(`[getServiceAccountAuth] Email defined: ${!!email}, Key defined: ${!!key}`);
-  if (!email || !key) {
-    throw new Error('Google Service Account credentials are not set in environment variables.');
+  const serviceAccountJSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!serviceAccountJSON) {
+    throw new Error('The GOOGLE_SERVICE_ACCOUNT_JSON environment variable is not set.');
   }
-  console.log('[getServiceAccountAuth] ABOUT TO CALL new JWT()');
-  const jwt = new JWT({
-    email: email,
-    key: key,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-  console.log('[getServiceAccountAuth] new JWT() SUCCEEDED');
-  return jwt;
+
+  try {
+    const credentials = JSON.parse(serviceAccountJSON);
+    const jwt = new JWT({
+      email: credentials.client_email,
+      key: credentials.private_key,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+    return jwt;
+  } catch (error: any) {
+    throw new Error(`Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON: ${error.message}`);
+  }
 };
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
