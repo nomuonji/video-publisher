@@ -35,6 +35,21 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
     setConfig(prev => ({ ...prev, schedule: newSchedule }));
   };
 
+  const handlePostDetailChange = (
+    field: 'title' | 'description' | 'hashtags' | 'aiLabel',
+    value: string | boolean
+  ) => {
+    setConfig(prev => ({
+      ...prev,
+      postDetails: {
+        ...prev.postDetails,
+        [field]: value,
+      },
+    }));
+  };
+
+  // Ensure postDetails is initialized
+  const currentPostDetails = config.postDetails || { title: '', description: '', hashtags: '', aiLabel: false };
 
   return (
     <div className="space-y-4">
@@ -74,6 +89,62 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
             </div>
         </div>
         <p className="text-xs text-slate-500 mt-2">Schedule is in UTC. Current cron: <code>{config.schedule}</code></p>
+      </div>
+
+      {/* New Post Details Section */}
+      <div className="space-y-4 pt-4 border-t border-slate-700">
+        <h3 className="text-lg font-semibold text-slate-200">Post Details</h3>
+
+        {/* Title */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Video Title</label>
+          <TextInput
+            id="titleDefault"
+            label="Title"
+            value={currentPostDetails.title}
+            onChange={(e) => handlePostDetailChange('title', e.target.value)}
+            placeholder="e.g., My Awesome Video"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Video Description</label>
+          <TextInput
+            id="descriptionDefault"
+            label="Description"
+            value={currentPostDetails.description}
+            onChange={(e) => handlePostDetailChange('description', e.target.value)}
+            placeholder="e.g., Check out this amazing video!"
+            multiline
+          />
+        </div>
+
+        {/* Hashtags */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Hashtags</label>
+          <TextInput
+            id="hashtagsDefault"
+            label="Hashtags"
+            value={currentPostDetails.hashtags}
+            onChange={(e) => handlePostDetailChange('hashtags', e.target.value)}
+            placeholder="e.g., #awesome #video"
+          />
+        </div>
+
+        {/* AI Label */}
+        <div className="flex items-center mt-4">
+          <input
+            id="aiLabel"
+            type="checkbox"
+            checked={currentPostDetails.aiLabel}
+            onChange={(e) => handlePostDetailChange('aiLabel', e.target.checked)}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          />
+          <label htmlFor="aiLabel" className="ml-2 block text-sm text-slate-300">
+            Apply AI Label (TikTok, Instagram)
+          </label>
+        </div>
       </div>
     </div>
   );

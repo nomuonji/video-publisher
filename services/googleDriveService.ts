@@ -43,21 +43,32 @@ const getVStockFolderId = async (accessToken: string): Promise<string> => {
 };
 
 const createSubFolder = async (accessToken: string, name: string, parentId: string): Promise<string> => {
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth });
+
     const fileMetadata = {
         name: name,
         mimeType: 'application/vnd.google-apps.folder',
         parents: [parentId],
     };
-    const options = {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+
+    const res = await drive.files.create({
+        requestBody: fileMetadata,
+        fields: 'id',
+    });
+    const folderId = res.data.id!;
+
+    // Make the folder public
+    await drive.permissions.create({
+        fileId: folderId,
+        requestBody: {
+            role: 'reader',
+            type: 'anyone',
         },
-        body: JSON.stringify(fileMetadata),
-    };
-    const data = await apiFetch(`${DRIVE_API_URL}?fields=id`, options);
-    return data.id;
+    });
+
+    return folderId;
 };
 
 const createConfigFile = async (accessToken: string, config: ConceptConfig, parentId: string): Promise<string> => {
@@ -147,7 +158,13 @@ export const createConcept = async (accessToken: string, name: string): Promise<
           token_type: '',
         },
         instagram: '',
-      }
+      },
+      postDetails: {
+        title: '{video_name}',
+        description: '{video_name}',
+        hashtags: '{concept_name_tag}',
+        aiLabel: false,
+      },
     };
 
     await createConfigFile(accessToken, defaultConfig, conceptFolderId);

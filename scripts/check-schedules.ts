@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import parser from 'cron-parser';
+import { spawn } from 'child_process';
 
 // --- Authentication ---
 function getAuth() {
@@ -60,12 +61,37 @@ async function main() {
       console.log(`- Checking concept '${config.name}': Schedule '${config.schedule}'. Last due: ${previousExecution.toISOString()}`);
 
       if (previousExecution >= oneHourAgo) {
-        // This is where you would trigger the actual video processing job
         console.log(`  -> EXECUTING job for concept: ${config.name}`);
         executedJobs.push({ 
           name: config.name, 
           schedule: config.schedule, 
           executedAt: executionTime.toISOString() 
+        });
+
+        // Trigger post-video.ts script
+        const child = spawn('npx', ['ts-node', 'scripts/post-video.ts'], {
+          env: {
+            ...process.env, // Pass all current environment variables
+            CONCEPT_ID: folder.id!, // Pass the conceptId
+            GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON!, // Pass SA JSON
+          },
+          stdio: 'inherit', // Pipe child process output to parent's stdout/stderr
+        });
+
+        await new Promise((resolve, reject) => {
+          child.on('close', (code) => {
+            if (code === 0) {
+              console.log(`  -> Post-video script for ${config.name} completed successfully.`);
+              resolve(null);
+            } else {
+              console.error(`  -> Post-video script for ${config.name} failed with code ${code}.`);
+              reject(new Error(`Post-video script failed for ${config.name}`));
+            }
+          });
+          child.on('error', (err) => {
+            console.error(`  -> Failed to start post-video script for ${config.name}:`, err);
+            reject(err);
+          });
         });
       }
     } catch (err: any) {

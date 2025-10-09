@@ -31,12 +31,19 @@ export interface ConceptConfig {
   name: string;
   schedule: string; // e.g., '0 8 * * *' (cron format)
   platforms: SelectedPlatforms;
-      apiKeys: {
-      youtube_refresh_token?: string; // For server-side publishing
-      youtube_channel_id?: string;
-      tiktok: TikTokTokens;
-      instagram: string;
-    };}
+  apiKeys: {
+    youtube_refresh_token?: string; // For server-side publishing
+    youtube_channel_id?: string;
+    tiktok: TikTokTokens;
+    instagram: string;
+  };
+  postDetails: {
+    title: string;
+    description: string;
+    hashtags: string;
+    aiLabel: boolean;
+  };
+}
 
 // Represents a full concept, which is a folder in Google Drive
 export interface Concept {
