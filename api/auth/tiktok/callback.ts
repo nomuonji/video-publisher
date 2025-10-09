@@ -57,12 +57,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // 1. Exchange code for TikTok access token
     const tokenEndpoint = 'https://open.tiktokapis.com/v2/oauth/token/';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const redirectUri = `${proto}://${host}/api/auth/tiktok/callback`;
+
     const params = new URLSearchParams();
     params.append('client_key', process.env.TIKTOK_CLIENT_KEY!);
     params.append('client_secret', process.env.TIKTOK_CLIENT_SECRET!);
     params.append('code', code);
     params.append('grant_type', 'authorization_code');
-    params.append('redirect_uri', `https://video-publisher.vercel.app/api/auth/tiktok/callback`);
+    params.append('redirect_uri', redirectUri);
 
     const tokenResponse = await fetch(tokenEndpoint, {
       method: 'POST',

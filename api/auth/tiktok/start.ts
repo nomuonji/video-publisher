@@ -9,8 +9,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const clientId = process.env.TIKTOK_CLIENT_KEY;
-  // This should be the production URL, or dynamically determined.
-  const redirectUri = `https://video-publisher.vercel.app/api/auth/tiktok/callback`;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || 'http';
+  const redirectUri = `${proto}://${host}/api/auth/tiktok/callback`;
+
   const scope = 'user.info.basic,video.upload,video.publish'; // Added video.publish
   const responseType = 'code';
   
