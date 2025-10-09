@@ -21,13 +21,14 @@ export interface ConceptConfig {
   name: string;
   schedule: string; // e.g., '0 8 * * *' (cron format)
   platforms: SelectedPlatforms;
+}
+
 export interface ApiKeys {
     gemini: string;
     youtube: string; // This might become legacy, for now we keep it.
     youtube_refresh_token?: string; // For server-side publishing
     tiktok: string;
     instagram: string;
-}
 }
 
 // Represents a full concept, which is a folder in Google Drive
