@@ -174,6 +174,8 @@ function App() {
         }
     }, [selectedConcept, fetchVideos]);
 
+
+
     const handleSelectConcept = (id: string) => {
         setSelectedConceptId(id);
     };
@@ -314,6 +316,7 @@ function App() {
                             onSave={handleSaveConfig} 
                             onRefresh={fetchConcepts} 
                             instagramAccounts={instagramAccounts}
+                            accessToken={accessToken}
                         />
                     ) : concepts.length > 0 ? (
                         <Card><p className="p-4 text-center text-slate-400">Please select a concept to begin.</p></Card>

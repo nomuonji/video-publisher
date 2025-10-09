@@ -9,9 +9,10 @@ interface ApiConfigProps {
     onRefresh: () => void;
     onSave: (newConfig: ConceptConfig) => Promise<void>;
     instagramAccounts: any[];
+    accessToken: string | null;
 }
 
-export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConfig, onRefresh, onSave, instagramAccounts }) => {
+export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConfig, onRefresh, onSave, instagramAccounts, accessToken }) => {
 
     const isYouTubeConnected = !!config.apiKeys.youtube_refresh_token;
     const isTikTokConnected = !!config.apiKeys.tiktok;
@@ -40,7 +41,13 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
 
     const handleConnectYouTube = () => openAuthPopup(`/api/auth/start?conceptId=${conceptId}`);
     const handleConnectTikTok = () => openAuthPopup(`/api/auth/tiktok/start?conceptId=${conceptId}`);
-    const handleConnectInstagram = () => openAuthPopup(`/api/auth/instagram/start?conceptId=${conceptId}`);
+    const handleConnectInstagram = () => {
+        if (!accessToken) {
+            alert("Authentication error: Google access token is missing.");
+            return;
+        }
+        openAuthPopup(`/api/auth/instagram/start?conceptId=${conceptId}&accessToken=${accessToken}`);
+    };
 
     const handleDisconnect = (platform: 'youtube' | 'tiktok' | 'instagram') => {
         if (!window.confirm(`Are you sure you want to disconnect ${platform}?`)) return;
