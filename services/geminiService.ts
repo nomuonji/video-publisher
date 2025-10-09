@@ -8,7 +8,7 @@ export interface GeneratedContent {
 }
 
 // Per coding guidelines, API key must be from process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
 
 export const generateContent = async (topic: string): Promise<GeneratedContent> => {
     const prompt = `
@@ -50,7 +50,10 @@ export const generateContent = async (topic: string): Promise<GeneratedContent> 
             },
         });
         
-        const jsonText = response.text.trim();
+        const jsonText = response.text?.trim();
+        if (!jsonText) {
+          throw new Error("AI response is empty.");
+        }
         const parsedContent = JSON.parse(jsonText) as GeneratedContent;
         
         if (!parsedContent.title || !parsedContent.description || !parsedContent.tags) {

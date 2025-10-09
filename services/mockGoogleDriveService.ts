@@ -69,7 +69,7 @@ if (rootConcepts.length === 0) {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const listConceptFolders = async (): Promise<Concept[]> => {
+export const listConceptFolders = async (_accessToken: string): Promise<Concept[]> => {
   console.log('MOCK: Listing concept folders...');
   await delay(500);
   const concepts: Concept[] = rootConcepts.map(conceptId => {
@@ -90,7 +90,7 @@ export const listConceptFolders = async (): Promise<Concept[]> => {
   return concepts;
 };
 
-export const createConcept = async (name: string): Promise<Concept> => {
+export const createConcept = async (_accessToken: string, name: string): Promise<Concept> => {
   console.log(`MOCK: Creating concept "${name}"...`);
   await delay(300);
   if (Object.values(mockDatabase).some(item => item.name === name && item.type === 'folder')) {
@@ -99,7 +99,7 @@ export const createConcept = async (name: string): Promise<Concept> => {
   return createNewConceptInDB(name);
 };
 
-export const deleteConcept = async (conceptId: string): Promise<void> => {
+export const deleteConcept = async (_accessToken: string, conceptId: string): Promise<void> => {
     console.log(`MOCK: Deleting concept "${conceptId}"...`);
     await delay(300);
     const index = rootConcepts.indexOf(conceptId);
@@ -112,7 +112,7 @@ export const deleteConcept = async (conceptId: string): Promise<void> => {
     return Promise.resolve();
 };
 
-export const updateConceptConfig = async (conceptId: string, config: ConceptConfig): Promise<void> => {
+export const updateConceptConfig = async (_accessToken: string, conceptId: string, config: ConceptConfig): Promise<void> => {
     console.log(`MOCK: Updating config for "${conceptId}"...`);
     await delay(400);
     const conceptFolder = mockDatabase[conceptId];
@@ -130,7 +130,7 @@ export const updateConceptConfig = async (conceptId: string, config: ConceptConf
 };
 
 
-export const listVideos = async (folderId: string): Promise<VideoFile[]> => {
+export const listVideos = async (_accessToken: string, folderId: string): Promise<VideoFile[]> => {
   console.log(`MOCK: Listing videos in folder "${folderId}"...`);
   await delay(600);
   const folder = mockDatabase[folderId];

@@ -10,7 +10,7 @@ interface UploadParams {
 }
 
 // This is a simplified example. In a real application, you would need to handle errors and edge cases.
-export async function uploadVideoToTiktok({ accessToken, openId, videoUrl }: UploadParams): Promise<any> {
+export async function uploadVideoToTiktok({ accessToken, openId, videoUrl }: UploadParams): Promise<unknown> {
   const uploadEndpoint = `${TIKTOK_API_BASE_URL}/v2/post/publish/video/init/`;
 
   const headers = {
@@ -28,6 +28,9 @@ export async function uploadVideoToTiktok({ accessToken, openId, videoUrl }: Upl
       source: 'PULL_FROM_URL',
       video_url: videoUrl,
     },
+    user_info: {
+        open_id: openId,
+    }
   });
 
   const response = await fetch(uploadEndpoint, {

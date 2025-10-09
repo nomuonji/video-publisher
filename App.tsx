@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Concept, ConceptConfig, VideoFile } from './types';
 import * as driveService from './services/googleDriveService';
 import * as mockDriveService from './services/mockGoogleDriveService';
