@@ -1,0 +1,31 @@
+
+{
+  "name": "social-video-publisher",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.22.0",
+    "@vercel/node": "^3.2.0",
+    "cron-parser": "^4.9.0",
+    "dotenv": "^16.4.5",
+    "google-auth-library": "^9.11.0",
+    "googleapis": "^140.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@vitejs/plugin-react": "^4.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0"
+  }
+}

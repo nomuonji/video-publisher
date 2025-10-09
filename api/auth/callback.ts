@@ -1,0 +1,133 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { OAuth2Client } from 'google-auth-library';
+import { google } from 'googleapis';
+import { JWT } from 'google-auth-library';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config({ path: '.env.local' });
+
+// --- OAuth Client for User ---
+const getOAuth2Client = (req: VercelRequest) => {
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || 'http';
+  const redirectUri = `${proto}://${host}/api/auth/callback`;
+
+  return new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri
+  );
+};
+
+// --- Service Account Client for Drive ---
+const getServiceAccountAuth = () => {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set.');
+  }
+  const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  return new JWT({
+    email: serviceAccountKey.client_email,
+    key: serviceAccountKey.private_key,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+};
+
+// --- Main Handler ---
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const { code, state } = req.query;
+
+  if (!code || typeof code !== 'string') {
+    return res.status(400).send('Authorization code is missing.');
+  }
+  if (!state || typeof state !== 'string') {
+    return res.status(400).send('State is missing.');
+  }
+
+  try {
+    const { conceptId } = JSON.parse(state);
+    if (!conceptId) {
+      return res.status(400).send('Concept ID not found in state.');
+    }
+
+    // 1. Exchange code for refresh token
+    const oauth2Client = getOAuth2Client(req);
+    const { tokens } = await oauth2Client.getToken(code);
+    const refreshToken = tokens.refresh_token;
+
+    if (!refreshToken) {
+      throw new Error('Refresh token not granted. Please ensure you are providing consent.');
+    }
+
+    // 2. Use service account to update config.json on Google Drive
+    const serviceAuth = getServiceAccountAuth();
+    const drive = google.drive({ version: 'v3', auth: serviceAuth });
+
+    // Find the config.json file for the concept
+    const fileRes = await drive.files.list({
+        q: `'${conceptId}' in parents and name='config.json' and trashed=false`,
+        fields: 'files(id)',
+        pageSize: 1,
+    });
+    const configFile = fileRes.data.files?.[0];
+    if (!configFile || !configFile.id) {
+        throw new Error(`config.json not found for concept ${conceptId}`);
+    }
+
+    // Get current config content
+    const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' });
+    const currentConfig = contentRes.data;
+
+    // Update config with the new refresh token
+    const newConfig = {
+        ...currentConfig,
+        apiKeys: {
+            ...currentConfig.apiKeys,
+            youtube_refresh_token: refreshToken,
+        }
+    };
+
+    // Upload the updated config.json
+    await drive.files.update({
+        fileId: configFile.id,
+        media: {
+            mimeType: 'application/json',
+            body: JSON.stringify(newConfig, null, 2),
+        },
+    });
+
+    // 3. Return a script to the popup that messages the parent window and closes itself
+    res.setHeader('Content-Type', 'text/html');
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Authentication Success</title></head>
+        <body>
+          <script>
+            window.opener.postMessage({ status: 'success', service: 'youtube' }, '*');
+            window.close();
+          </script>
+          <p>Authentication successful! You can now close this window.</p>
+        </body>
+      </html>
+    `);
+
+  } catch (error: any) {
+    console.error('Callback handler failed:', error);
+    // Return a script that posts an error message
+    res.setHeader('Content-Type', 'text/html');
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Authentication Failed</title></head>
+        <body>
+          <script>
+            window.opener.postMessage({ status: 'error', service: 'youtube', message: '${error.message}' }, '*');
+            window.close();
+          </script>
+          <p>Authentication failed. Please try again. You can close this window.</p>
+        </body>
+      </html>
+    `);
+  }
+}

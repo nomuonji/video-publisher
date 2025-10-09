@@ -1,0 +1,6 @@
+
+{
+  "name": "Social Video Publisher",
+  "description": "A tool to help generate GitHub Actions workflows for automatically posting videos from Google Drive to TikTok, YouTube, and Instagram. It uses AI to help generate engaging titles, descriptions, and tags.",
+  "requestFramePermissions": []
+}
