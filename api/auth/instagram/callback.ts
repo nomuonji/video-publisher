@@ -4,21 +4,45 @@ import fetch from 'node-fetch';
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+
+console.log('Instagram callback module initializing…');
 
 // Load environment variables
-dotenv.config({ path: '.env.local' });
+const candidateEnvPaths = [
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '.env'),
+];
+const resolvedEnvPath = candidateEnvPaths.find((candidate) => fs.existsSync(candidate));
+console.log('Instagram callback cwd:', process.cwd());
+console.log('Instagram callback env candidates:', candidateEnvPaths);
+console.log('Instagram callback resolved env path:', resolvedEnvPath);
+if (resolvedEnvPath) {
+  dotenv.config({ path: resolvedEnvPath });
+  console.log('Instagram callback dotenv.config applied');
+} else {
+  console.warn('Instagram callback: no env file found via candidates.');
+}
 
 // --- Utility Functions ---
 
 const getServiceAccountAuth = () => {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+  console.log('[getServiceAccountAuth] ENTERED');
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_PRIVATE_KEY;
+  console.log(`[getServiceAccountAuth] Email defined: ${!!email}, Key defined: ${!!key}`);
+  if (!email || !key) {
     throw new Error('Google Service Account credentials are not set in environment variables.');
   }
-  return new JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY,
+  console.log('[getServiceAccountAuth] ABOUT TO CALL new JWT()');
+  const jwt = new JWT({
+    email: email,
+    key: key,
     scopes: ['https://www.googleapis.com/auth/drive'],
   });
+  console.log('[getServiceAccountAuth] new JWT() SUCCEEDED');
+  return jwt;
 };
 
 const renderResponseScript = (status: 'success' | 'error', service: string, message?: string) => `
@@ -40,6 +64,11 @@ const GRAPH_API_URL = 'https://graph.facebook.com/v19.0';
 // --- Main Handler ---
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('ENV GOOGLE_PRIVATE_KEY defined:', Boolean(process.env.GOOGLE_PRIVATE_KEY));
+  console.log('ENV GOOGLE_PRIVATE_KEY length:', process.env.GOOGLE_PRIVATE_KEY?.length);
+  console.log('ENV GOOGLE_SERVICE_ACCOUNT_EMAIL defined:', Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL));
+  console.log('ENV GOOGLE_SERVICE_ACCOUNT_JSON defined:', Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON));
+  console.log('ENV GOOGLE_SERVICE_ACCOUNT_JSON length:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.length);
   const { code, state } = req.query;
 
   if (!code || typeof code !== 'string') {
@@ -285,7 +314,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   
 
-              throw new Error('The root 'v-stock' folder was not found in your Google Drive.');
+              throw new Error('The root \'v-stock\' folder was not found in your Google Drive.');
 
   
 
@@ -409,7 +438,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (error: any) {
 
-      console.error('Instagram callback handler failed:', error.message);
+      console.error('Instagram callback handler failed:', error);
+      if (error && error.stack) {
+        console.error('Instagram callback handler stack:', error.stack);
+      }
 
       res.setHeader('Content-Type', 'text/html');
 

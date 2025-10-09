@@ -10,14 +10,21 @@ dotenv.config({ path: '.env.local' });
 
 // --- Service Account Client for Drive ---
 const getServiceAccountAuth = () => {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+  console.log('[getServiceAccountAuth] ENTERED');
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_PRIVATE_KEY;
+  console.log(`[getServiceAccountAuth] Email defined: ${!!email}, Key defined: ${!!key}`);
+  if (!email || !key) {
     throw new Error('Google Service Account credentials are not set in environment variables.');
   }
-  return new JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY,
+  console.log('[getServiceAccountAuth] ABOUT TO CALL new JWT()');
+  const jwt = new JWT({
+    email: email,
+    key: key,
     scopes: ['https://www.googleapis.com/auth/drive'],
   });
+  console.log('[getServiceAccountAuth] new JWT() SUCCEEDED');
+  return jwt;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
