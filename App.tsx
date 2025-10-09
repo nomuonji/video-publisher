@@ -33,6 +33,7 @@ function App() {
     
     const [concepts, setConcepts] = useState<Concept[]>([]);
     const [instagramAccounts, setInstagramAccounts] = useState<any[]>([]);
+    const [youtubeChannels, setYouTubeChannels] = useState<any[]>([]);
     const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
     const [queuedVideos, setQueuedVideos] = useState<VideoFile[]>([]);
     const [postedVideos, setPostedVideos] = useState<VideoFile[]>([]);
@@ -116,6 +117,17 @@ function App() {
         }
     }, [isSignedIn, accessToken, service]);
 
+    const fetchYouTubeChannels = useCallback(async () => {
+        if (!isSignedIn || !accessToken) return;
+        try {
+            const channels = await service.getYouTubeChannels(accessToken!);
+            setYouTubeChannels(channels);
+        } catch (err: any) {
+            console.error("Error fetching YouTube channels:", err);
+            setError(`Failed to fetch YouTube channels: ${err.message}`);
+        }
+    }, [isSignedIn, accessToken, service]);
+
     const fetchConcepts = useCallback(async () => {
         if (!isSignedIn || !accessToken) return;
         setIsLoadingConcepts(true);
@@ -124,6 +136,7 @@ function App() {
             const [fetchedConcepts] = await Promise.all([
                 service.listConceptFolders(accessToken!),
                 fetchInstagramAccounts(),
+                fetchYouTubeChannels(),
             ]);
 
             setConcepts(fetchedConcepts);
@@ -317,6 +330,7 @@ function App() {
                             onRefresh={fetchConcepts} 
                             instagramAccounts={instagramAccounts}
                             accessToken={accessToken}
+                            youtubeChannels={youtubeChannels}
                         />
                     ) : concepts.length > 0 ? (
                         <Card><p className="p-4 text-center text-slate-400">Please select a concept to begin.</p></Card>

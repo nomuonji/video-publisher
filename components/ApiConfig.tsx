@@ -10,9 +10,10 @@ interface ApiConfigProps {
     onSave: (newConfig: ConceptConfig) => Promise<void>;
     instagramAccounts: any[];
     accessToken: string | null;
+    youtubeChannels: any[];
 }
 
-export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConfig, onRefresh, onSave, instagramAccounts, accessToken }) => {
+export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConfig, onRefresh, onSave, instagramAccounts, accessToken, youtubeChannels }) => {
 
     const isYouTubeConnected = !!config.apiKeys.youtube_refresh_token;
     const isTikTokConnected = !!config.apiKeys.tiktok;
@@ -82,6 +83,12 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
         onSave(newConfig);
     };
 
+    const handleYouTubeChannelSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newConfig = { ...config, apiKeys: { ...config.apiKeys, youtube_channel_id: e.target.value } };
+        setConfig(newConfig);
+        onSave(newConfig);
+    };
+
     return (
         <div className="space-y-4">
             <h3 className="text-lg font-semibold text-slate-200">API Keys & Secrets</h3>
@@ -109,6 +116,29 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
                     </div>
                 ) : (
                     <button onClick={handleConnectTikTok} className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-md">Connect with TikTok</button>
+                )}
+            </div>
+
+            {/* YouTube Channel Selection */}
+            <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                <h4 className="font-semibold text-slate-200 mb-2">YouTube Channel</h4>
+                {youtubeChannels.length > 0 ? (
+                    <div>
+                        <label htmlFor="youtube-channel-select" className="text-sm text-slate-400 mb-1 block">Select channel to post to:</label>
+                        <select
+                            id="youtube-channel-select"
+                            value={config.apiKeys.youtube_channel_id || ''}
+                            onChange={handleYouTubeChannelSelect}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        >
+                            <option value="" disabled>-- Select a Channel --</option>
+                            {youtubeChannels.map(channel => (
+                                <option key={channel.id} value={channel.id}>{channel.title}</option>
+                            ))}
+                        </select>
+                    </div>
+                ) : (
+                    <p className="text-sm text-slate-400">No YouTube channels found or connected. Please ensure your Google account has YouTube channels.</p>
                 )}
             </div>
 
