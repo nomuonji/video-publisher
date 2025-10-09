@@ -12,10 +12,9 @@ interface ConfigEditorProps {
     onRefresh: () => void;
     instagramAccounts: any[];
     accessToken: string | null;
-    youtubeChannels: any[];
 }
 
-export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptConfig, onSave, onRefresh, instagramAccounts, accessToken, youtubeChannels }) => {
+export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptConfig, onSave, onRefresh, instagramAccounts, accessToken }) => {
     const [config, setConfig] = useState<ConceptConfig>(conceptConfig);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -50,7 +49,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptCo
                     onSave={onSave} 
                     instagramAccounts={instagramAccounts} 
                     accessToken={accessToken}
-                    youtubeChannels={youtubeChannels}
                 />
             </div>
             <div className="mt-6 pt-6 border-t border-slate-700">

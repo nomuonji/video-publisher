@@ -228,11 +228,4 @@ export const getInstagramAccounts = async (accessToken: string): Promise<any[]> 
     return configResponse.json();
 };
 
-export const getYouTubeChannels = async (accessToken: string): Promise<any[]> => {
-    const response = await fetch(`/api/youtube/channels?accessToken=${accessToken}`);
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(`Failed to fetch YouTube channels: ${errorData.message}`);
-    }
-    return response.json();
-};
+
