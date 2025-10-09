@@ -8,7 +8,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { videoId, conceptId } = req.body;
+        const { videoId, conceptId, platforms: manualPlatforms } = req.body;
 
         if (!videoId || !conceptId) {
             return res.status(400).json({ error: 'Missing videoId or conceptId in request body' });
@@ -23,6 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // 2. conceptIdから設定ファイル(config.json)を読み込む
         // const config = await getConceptConfig(auth, conceptId);
+        // Placeholder for config
+        const config = { 
+            platforms: { YouTube: true, TikTok: true, Instagram: false }, 
+            apiKeys: { tiktok: process.env.TIKTOK_ACCESS_TOKEN, youtube_refresh_token: '' }
+        };
 
         // 3. videoIdを使ってGoogle Driveから動画ファイルをダウンロード
         // const videoFile = await downloadVideo(auth, videoId);
@@ -33,13 +38,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`[Placeholder] Generating content for concept...`);
 
         // 5. 各プラットフォームに投稿
-        for (const platform of Object.keys(config.platforms)) {
-            if (config.platforms[platform]) {
+        const platformsToPost = manualPlatforms || config.platforms;
+        for (const platform of Object.keys(platformsToPost)) {
+            if (platformsToPost[platform]) {
                 console.log(`Posting to ${platform}...`);
                 if (platform === 'TikTok') {
                     // In a real app, you'd get these from a user-specific database record
-                    const accessToken = process.env.TIKTOK_ACCESS_TOKEN!;
-                    const openId = process.env.TIKTOK_OPEN_ID!;
+                    const tiktokTokenInfo = JSON.parse(config.apiKeys.tiktok || '{}');
+                    const accessToken = tiktokTokenInfo.access_token;
+                    const openId = tiktokTokenInfo.open_id;
+
+                    if (!accessToken || !openId) {
+                        console.error('TikTok credentials not found in config.');
+                        continue; // Skip to next platform
+                    }
+
                     // This URL should point to the video file downloaded from Google Drive
                     const videoUrl = 'https://www.example.com/video.mp4'; // Placeholder
 

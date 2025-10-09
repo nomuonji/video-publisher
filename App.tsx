@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Concept, ConceptConfig, VideoFile } from './types';
+import type { Concept, ConceptConfig, VideoFile, SelectedPlatforms } from './types';
 import * as driveService from './services/googleDriveService';
 import * as mockDriveService from './services/mockGoogleDriveService';
 import { Header } from './components/Header';
@@ -7,6 +7,7 @@ import { Instructions } from './components/Instructions';
 import { Card } from './components/Card';
 import { ConfigEditor } from './components/ConfigEditor';
 import { VideoStatus } from './components/VideoStatus';
+import { PostConfirmationModal } from './components/PostConfirmationModal';
 import { PlusCircleIcon, TrashIcon, RefreshIcon, SpinnerIcon } from './components/icons/UtilityIcons';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -47,16 +48,17 @@ function App() {
     const [error, setError] = useState<string | null>(null);
     const [isPosting, setIsPosting] = useState<string | null>(null); // null or the videoId being posted
 
+    const [isPostingModalOpen, setIsPostingModalOpen] = useState(false);
+    const [videoToPost, setVideoToPost] = useState<VideoFile | null>(null);
+
     const isSignedIn = !!accessToken;
     const isMockMode = useMockMode();
-    // Use the real service if not in mock mode.
     const service = useMemo(() => (isMockMode ? mockDriveService : driveService), [isMockMode]);
 
     const selectedConcept = useMemo(() => {
         return concepts.find(c => c.googleDriveFolderId === selectedConceptId) || null;
     }, [concepts, selectedConceptId]);
 
-    // Effect for initializing Google Identity Services (for Auth)
     useEffect(() => {
         const script = document.createElement('script');
         script.src = 'https://accounts.google.com/gsi/client';
@@ -116,7 +118,6 @@ function App() {
         setIsLoadingConcepts(true);
         setError(null);
         try {
-            // Pass accessToken to the service function
             const fetchedConcepts = await service.listConceptFolders(accessToken!);
             setConcepts(fetchedConcepts);
             if (fetchedConcepts.length > 0 && !selectedConceptId) {
@@ -215,21 +216,20 @@ function App() {
         }
     };
 
-    const handlePostVideo = async (videoId: string) => {
-        if (!selectedConcept) return;
-
+    const handleInitiatePost = (videoId: string) => {
         const video = queuedVideos.find(v => v.id === videoId);
-        if (!video) {
-            setError("Video not found in the queue.");
-            return;
+        if (video) {
+            setVideoToPost(video);
+            setIsPostingModalOpen(true);
         }
+    };
 
-        if (!window.confirm(`Are you sure you want to post the video "${video.name}"?`)) {
-            return;
-        }
+    const handlePostVideo = async (platforms: SelectedPlatforms) => {
+        if (!videoToPost || !selectedConcept) return;
 
-        setIsPosting(videoId);
+        setIsPosting(videoToPost.id);
         setError(null);
+        setIsPostingModalOpen(false);
 
         try {
             const response = await fetch('/api/post', {
@@ -238,8 +238,9 @@ function App() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    videoId: videoId,
+                    videoId: videoToPost.id,
                     conceptId: selectedConcept.googleDriveFolderId,
+                    platforms: platforms,
                 }),
             });
 
@@ -248,17 +249,17 @@ function App() {
                 throw new Error(errorData.details || 'Failed to start post process.');
             }
 
-            alert(`Successfully started posting process for "${video.name}". The video will be moved to 'Posted' shortly.`);
+            alert(`Successfully started posting process for "${videoToPost.name}". The video will be moved to 'Posted' shortly.`);
 
-            // Poll for changes instead of using a fixed timeout
             setTimeout(() => {
                 fetchVideos();
-            }, 3000); // 3-second delay to allow backend to process
+            }, 3000);
 
         } catch (err: any) {
             setError(`Failed to post video: ${err.message}`);
         } finally {
             setIsPosting(null);
+            setVideoToPost(null);
         }
     };
 
@@ -325,7 +326,7 @@ function App() {
                                 queuedVideos={queuedVideos}
                                 postedVideos={postedVideos}
                                 isLoading={isLoadingVideos}
-                                onPostVideo={handlePostVideo}
+                                onInitiatePost={handleInitiatePost}
                                 postingVideoId={isPosting}
                             />
                         </>
@@ -383,6 +384,15 @@ function App() {
                 )}
                 {renderContent()}
             </div>
+             {videoToPost && (
+                <PostConfirmationModal 
+                    video={videoToPost}
+                    isOpen={isPostingModalOpen}
+                    onClose={() => setIsPostingModalOpen(false)}
+                    onConfirm={handlePostVideo}
+                    isPosting={!!isPosting}
+                />
+             )}
              {error && (
                 <div className="fixed bottom-4 right-4 bg-red-800/90 text-white p-4 rounded-lg shadow-lg max-w-md z-50">
                     <h4 className="font-bold">An Error Occurred</h4>

@@ -7,7 +7,7 @@ interface VideoStatusProps {
   queuedVideos: VideoFile[];
   postedVideos: VideoFile[];
   isLoading: boolean;
-  onPostVideo: (videoId: string) => void;
+  onInitiatePost: (videoId: string) => void;
   postingVideoId: string | null;
 }
 
@@ -64,7 +64,7 @@ const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, p
     );
 };
 
-export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVideos, isLoading, onPostVideo, postingVideoId }) => {
+export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVideos, isLoading, onInitiatePost, postingVideoId }) => {
   const [activeTab, setActiveTab] = useState<Tab>('Queued');
 
   return (
@@ -103,7 +103,7 @@ export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVi
             </div>
         ) : (
             <>
-              {activeTab === 'Queued' && <VideoList videos={queuedVideos} showPostButton={true} onPost={onPostVideo} postingVideoId={postingVideoId} />}
+              {activeTab === 'Queued' && <VideoList videos={queuedVideos} showPostButton={true} onPost={onInitiatePost} postingVideoId={postingVideoId} />}
               {activeTab === 'Posted' && <VideoList videos={postedVideos} showPostButton={false} postingVideoId={null} />}
             </>
         )}
