@@ -33,8 +33,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     access_type: 'offline',
     prompt: 'consent select_account',
     scope: [
-      'https://www.googleapis.com/auth/youtube',
-      'https://www.googleapis.com/auth/drive.readonly' // Scope for reading config
+      'https://www.googleapis.com/auth/youtube'
     ],
     state: JSON.stringify({ conceptId, accessToken }), // Pass conceptId and accessToken through the state
   });
