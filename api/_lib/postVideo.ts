@@ -282,12 +282,6 @@ export async function performVideoPosting({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          post_info: {
-            title,
-            description: description + (hashtags ? `\n\n${hashtags}` : ''),
-            privacy_level: 'SELF',
-            ai_generated_content: aiLabel,
-          },
           source_info: {
             source: 'FILE_UPLOAD',
             video_size: videoByteLength,
@@ -365,7 +359,7 @@ export async function performVideoPosting({
         body: JSON.stringify({
           media_type: 'VIDEO',
           upload_type: 'resumable',
-          caption: 'Test Caption from API',
+          caption: `${title}\n${description}\n${hashtags}`,
           is_ai_generated: aiLabel,
         }),
       });

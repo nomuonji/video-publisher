@@ -335,6 +335,8 @@ function App() {
         }
     };
 
+
+
     const renderContent = () => {
         if (!isSignedIn) {
             return (
@@ -392,8 +394,8 @@ function App() {
                                 postingVideoId={isPosting}
                                 conceptDefaultPostDetails={selectedConcept.config.postDetails || { title: '', description: '', hashtags: '', aiLabel: false }}
                                 onUpdateVideoPostDetails={handleUpdateVideoPostDetails}
-                                onMoveVideo={handleMoveVideo}
-                                onDeleteVideo={handleDeleteVideo}
+                                onMoveVideo={handleMoveVideo},
+                                onDeleteVideo={handleDeleteVideo},
                                 videoActionBusyId={videoActionBusyId}
                             />
                         </>
