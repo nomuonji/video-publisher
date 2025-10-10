@@ -341,7 +341,7 @@ export async function performVideoPosting({
           type: 'anyone',
         },
       });
-      permissionId = permission.data.id;
+      permissionId = permission.data.id ?? null;
       console.log(`[performVideoPosting] Temporarily made file public with permission ID: ${permissionId}`);
 
       const targetInstagramAccount = instagramAccounts.find(acc => acc.id === config.apiKeys.instagram);
