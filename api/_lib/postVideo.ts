@@ -365,7 +365,7 @@ export async function performVideoPosting({
         body: JSON.stringify({
           media_type: 'VIDEO',
           upload_type: 'resumable',
-          caption: `${title}\n${description}\n${hashtags}`,
+          caption: 'Test Caption from API',
           is_ai_generated: aiLabel,
         }),
       });
