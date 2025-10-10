@@ -1,3 +1,4 @@
+import { google } from 'googleapis';
 import type { VideoFile, Concept, ConceptConfig } from '../types';
 
 const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3/files';

@@ -145,8 +145,25 @@ export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVi
             </div>
         ) : (
             <>
-              {activeTab === 'Queued' && <VideoList videos={queuedVideos} showPostButton={true} onPost={onInitiatePost} postingVideoId={postingVideoId} onEditPostDetails={handleEditPostDetails} />}
-              {activeTab === 'Posted' && <VideoList videos={postedVideos} showPostButton={false} postingVideoId={null} onEditPostDetails={handleEditPostDetails} />}
+              {activeTab === 'Queued' && (
+                <VideoList
+                  videos={queuedVideos}
+                  showPostButton={true}
+                  onPost={onInitiatePost}
+                  postingVideoId={postingVideoId}
+                  onEditPostDetails={handleEditPostDetails}
+                  conceptDefaultPostDetails={conceptDefaultPostDetails}
+                />
+              )}
+              {activeTab === 'Posted' && (
+                <VideoList
+                  videos={postedVideos}
+                  showPostButton={false}
+                  postingVideoId={null}
+                  onEditPostDetails={handleEditPostDetails}
+                  conceptDefaultPostDetails={conceptDefaultPostDetails}
+                />
+              )}
             </>
         )}
       </div>

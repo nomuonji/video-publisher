@@ -27,7 +27,13 @@ const createDefaultConfig = (name: string): ConceptConfig => ({
       token_type: '',
     },
     instagram: '',
-  }
+  },
+  postDetails: {
+    title: '{video_name}',
+    description: '{video_name}',
+    hashtags: '{concept_name_tag}',
+    aiLabel: false,
+  },
 });
 
 const createNewConceptInDB = (name: string): Concept => {
