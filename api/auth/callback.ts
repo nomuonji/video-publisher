@@ -2,6 +2,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
+import type { ConceptConfig } from '../../types';
+import { withNormalizedPostingTimes } from '../../utils/schedule';
 
 // --- OAuth Client for User ---
 const getOAuth2Client = (req: VercelRequest) => {
@@ -68,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Get current config content
     const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' }, { responseType: 'json' });
-    const currentConfig = contentRes.data;
+    const currentConfig = withNormalizedPostingTimes(contentRes.data as ConceptConfig);
 
     let youtubeChannelId = currentConfig?.apiKeys?.youtube_channel_id || '';
     let youtubeChannelName = currentConfig?.apiKeys?.youtube_channel_name || '';
@@ -89,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Update config with the new refresh token
-    const newConfig = {
+    const newConfig: ConceptConfig = {
         ...currentConfig,
         apiKeys: {
             ...currentConfig.apiKeys,
@@ -98,13 +100,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             youtube_channel_name: youtubeChannelName,
         }
     };
+    const normalizedConfig = withNormalizedPostingTimes(newConfig);
 
     // Upload the updated config.json
     await drive.files.update({
         fileId: configFile.id,
         media: {
             mimeType: 'application/json',
-            body: JSON.stringify(newConfig, null, 2),
+            body: JSON.stringify(normalizedConfig, null, 2),
         },
     });
 
