@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
-import type { VideoFile, SelectedPlatforms } from '../types';
-import { Card } from './Card';
-import { PlatformSelector } from './PlatformSelector';
+import type { VideoFile, SelectedPlatforms } from '../types.js';
+import { Card } from './Card.js';
+import { PlatformSelector } from './PlatformSelector.js';
 
 interface PostConfirmationModalProps {
   video: VideoFile;

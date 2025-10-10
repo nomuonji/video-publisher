@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import type { ConceptConfig } from '../types';
-import { withNormalizedPostingTimes } from '../utils/schedule';
-import { Card } from './Card';
-import { ApiConfig } from './ApiConfig';
-import { PlatformSelector } from './PlatformSelector';
-import { VideoDetails } from './VideoDetails';
+import type { ConceptConfig } from '../types.js';
+import { withNormalizedPostingTimes } from '../utils/schedule.js';
+import { Card } from './Card.js';
+import { ApiConfig } from './ApiConfig.js';
+import { PlatformSelector } from './PlatformSelector.js';
+import { VideoDetails } from './VideoDetails.js';
 
 interface ConfigEditorProps {
     conceptId: string;

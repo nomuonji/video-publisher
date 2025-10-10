@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Concept, ConceptConfig, VideoFile, SelectedPlatforms, PostResult } from './types';
-import * as driveService from './services/googleDriveService';
-import { Header } from './components/Header';
-import { Instructions } from './components/Instructions';
-import { Card } from './components/Card';
-import { ConfigEditor } from './components/ConfigEditor';
-import { VideoStatus } from './components/VideoStatus';
-import { PostConfirmationModal } from './components/PostConfirmationModal';
-import { PlusCircleIcon, TrashIcon, RefreshIcon, SpinnerIcon } from './components/icons/UtilityIcons';
+import type { Concept, ConceptConfig, VideoFile, SelectedPlatforms, PostResult } from './types.js';
+import * as driveService from './services/googleDriveService.js';
+import { Header } from './components/Header.js';
+import { Instructions } from './components/Instructions.js';
+import { Card } from './components/Card.js';
+import { ConfigEditor } from './components/ConfigEditor.js';
+import { VideoStatus } from './components/VideoStatus.js';
+import { PostConfirmationModal } from './components/PostConfirmationModal.js';
+import { PlusCircleIcon, TrashIcon, RefreshIcon, SpinnerIcon } from './components/icons/UtilityIcons.js';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const SCOPES = "https://www.googleapis.com/auth/drive";

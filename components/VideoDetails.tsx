@@ -1,8 +1,8 @@
 import React from 'react';
-import type { ConceptConfig } from '../types';
-import { DEFAULT_POST_DETAILS } from '../types';
-import { cronFromTime, ensurePostingTimesFromConfig, normalizePostingTimesList, normalizeTimeString } from '../utils/schedule';
-import { TextInput } from './TextInput';
+import type { ConceptConfig } from '../types.js';
+import { DEFAULT_POST_DETAILS } from '../types.js';
+import { cronFromTime, ensurePostingTimesFromConfig, normalizePostingTimesList, normalizeTimeString } from '../utils/schedule.js';
+import { TextInput } from './TextInput.js';
 
 interface VideoDetailsProps {
   config: ConceptConfig;

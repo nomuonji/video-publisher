@@ -1,4 +1,4 @@
-import type { ConceptConfig } from '../types';
+import type { ConceptConfig } from '../types.js';
 
 const DEFAULT_TIME = '08:00';
 

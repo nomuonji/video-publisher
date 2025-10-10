@@ -1,5 +1,5 @@
-import type { VideoFile, Concept, ConceptConfig } from '../types';
-import { withNormalizedPostingTimes } from '../utils/schedule';
+import type { VideoFile, Concept, ConceptConfig } from '../types.js';
+import { withNormalizedPostingTimes } from '../utils/schedule.js';
 
 const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -326,5 +326,3 @@ export const getInstagramAccounts = async (accessToken: string): Promise<any[]> 
     }
     return configResponse.json();
 };
-
-

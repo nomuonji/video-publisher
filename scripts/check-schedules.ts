@@ -1,8 +1,8 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import { spawn } from 'child_process';
-import type { ConceptConfig } from '../types';
-import { ensurePostingTimesFromConfig } from '../utils/schedule';
+import type { ConceptConfig } from '../types.js';
+import { ensurePostingTimesFromConfig } from '../utils/schedule.js';
 
 // --- Authentication ---
 function getAuth() {
@@ -53,7 +53,7 @@ async function main() {
     }
 
     const oneHourAgo = new Date(executionTime.getTime() - 60 * 60 * 1000);
-    const dueTime = postingTimes.find(time => {
+    const dueTime = postingTimes.find((time: string) => {
       const lastOccurrence = getMostRecentOccurrence(time, executionTime);
       return lastOccurrence >= oneHourAgo && lastOccurrence <= executionTime;
     });

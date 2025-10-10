@@ -1,4 +1,4 @@
-import { performVideoPosting } from '../api/_lib/postVideo';
+import { performVideoPosting } from '../api/_lib/postVideo.js';
 
 // --- Script entry point (for scheduled runs) ---
 if (require.main === module) {
@@ -17,7 +17,7 @@ if (require.main === module) {
   performVideoPosting({
     conceptId,
     serviceAccountJson,
-  }).catch(error => {
+  }).catch((error: any) => {
     console.error(`Error processing concept ${conceptId}:`, error);
     process.exit(1);
   });

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import type { VideoFile, ConceptConfig } from '../types';
-import { DEFAULT_POST_DETAILS } from '../types';
-import { SpinnerIcon } from './icons/UtilityIcons';
-import { Card } from './Card';
-import { VideoPostDetailsEditor } from './VideoPostDetailsEditor';
+import type { VideoFile, ConceptConfig } from '../types.js';
+import { DEFAULT_POST_DETAILS } from '../types.js';
+import { SpinnerIcon } from './icons/UtilityIcons.js';
+import { Card } from './Card.js';
+import { VideoPostDetailsEditor } from './VideoPostDetailsEditor.js';
 
 interface VideoStatusProps {
   queuedVideos: VideoFile[];

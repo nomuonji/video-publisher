@@ -1,8 +1,7 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
-import type { ConceptConfig } from '../../types';
+import type { ConceptConfig } from '../../types.js';
 import { withNormalizedPostingTimes } from '../../utils/schedule.js';
 
 // --- OAuth Client for User ---

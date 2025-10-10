@@ -1,5 +1,5 @@
-import type { VideoFile, Concept, ConceptConfig } from '../types';
-import { withNormalizedPostingTimes } from '../utils/schedule';
+import type { VideoFile, Concept, ConceptConfig } from '../types.js';
+import { withNormalizedPostingTimes } from '../utils/schedule.js';
 
 // --- In-Memory Mock Database ---
 

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import type { TikTokTokens } from '../../../types';
+import type { TikTokTokens } from '../../../types.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });

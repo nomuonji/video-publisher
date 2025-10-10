@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import type { ConceptConfig } from '../types';
+import type { ConceptConfig } from '../types.js';
 
 interface ApiConfigProps {
     conceptId: string;

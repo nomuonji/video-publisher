@@ -1,6 +1,6 @@
 import React from 'react';
-import type { PlatformInfo, SelectedPlatforms } from '../types';
-import { platforms } from '../constants';
+import type { PlatformInfo, SelectedPlatforms } from '../types.js';
+import { platforms } from '../constants.js';
 
 
 interface PlatformSelectorProps {

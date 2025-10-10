@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import type { VideoFile, ConceptConfig } from '../types';
-import { DEFAULT_POST_DETAILS } from '../types';
-import { TextInput } from './TextInput';
-import { Card } from './Card';
+import type { VideoFile, ConceptConfig } from '../types.js';
+import { DEFAULT_POST_DETAILS } from '../types.js';
+import { TextInput } from './TextInput.js';
+import { Card } from './Card.js';
 
 interface VideoPostDetailsEditorProps {
   video: VideoFile;
