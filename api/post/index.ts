@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { performVideoPosting } from '../_lib/postVideo.ts';
+import { performVideoPosting } from '../_lib/postVideo';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

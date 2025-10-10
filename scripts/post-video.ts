@@ -1,4 +1,4 @@
-import { performVideoPosting } from '../api/_lib/postVideo.ts';
+import { performVideoPosting } from '../api/_lib/postVideo';
 
 // --- Script entry point (for scheduled runs) ---
 if (require.main === module) {
