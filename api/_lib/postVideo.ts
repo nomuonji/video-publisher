@@ -209,14 +209,14 @@ export async function performVideoPosting({
         requestBody: {
           snippet: {
             title,
-            description,
+            description: `${description}\n\n${hashtags}`,
             tags: hashtags
               .split(' ')
               .filter((tag: string) => tag.startsWith('#'))
               .map((tag: string) => tag.substring(1)),
           },
           status: {
-            privacyStatus: 'private',
+            privacyStatus: 'public',
             madeForKids: false,
             selfDeclaredMadeForKids: false,
             // The YouTube Data API may introduce an explicit AI-generated flag in future versions.
@@ -279,7 +279,7 @@ export async function performVideoPosting({
             ai_generated_content: aiLabel,
           },
           source_info: {
-            source: 'PULL_FROM_URL',
+            source: 'FILE_UPLOAD',
             video_size: videoByteLength,
           },
         }),
@@ -331,7 +331,19 @@ export async function performVideoPosting({
 
   if (platformsToPost.Instagram && config.apiKeys.instagram && instagramAccounts.length > 0) {
     console.log(`[performVideoPosting] Posting to Instagram...`);
+    let permissionId: string | null = null;
     try {
+      // Temporarily make the file public so Instagram can fetch it
+      const permission = await drive.permissions.create({
+        fileId: videoToPost.id,
+        requestBody: {
+          role: 'reader',
+          type: 'anyone',
+        },
+      });
+      permissionId = permission.data.id;
+      console.log(`[performVideoPosting] Temporarily made file public with permission ID: ${permissionId}`);
+
       const targetInstagramAccount = instagramAccounts.find(acc => acc.id === config.apiKeys.instagram);
       if (!targetInstagramAccount) {
         console.error(`[performVideoPosting] Target Instagram account ${config.apiKeys.instagram} not found in loaded accounts.`);
@@ -400,6 +412,18 @@ export async function performVideoPosting({
       console.log(`[performVideoPosting] Video posted to Instagram: ${title}`);
     } catch (error) {
       console.error(`[performVideoPosting] Failed to post to Instagram:`, error);
+    } finally {
+      if (permissionId) {
+        try {
+          await drive.permissions.delete({
+            fileId: videoToPost.id,
+            permissionId: permissionId,
+          });
+          console.log(`[performVideoPosting] Successfully removed temporary public permission.`);
+        } catch (deleteError) {
+          console.error(`[performVideoPosting] CRITICAL: Failed to remove temporary public permission ${permissionId} for file ${videoToPost.id}. Please remove it manually.`, deleteError);
+        }
+      }
     }
   }
 
