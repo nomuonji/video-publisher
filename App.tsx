@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Concept, ConceptConfig, VideoFile, SelectedPlatforms } from './types';
+import type { Concept, ConceptConfig, VideoFile, SelectedPlatforms, PostResult } from './types';
 import * as driveService from './services/googleDriveService';
 import { Header } from './components/Header';
 import { Instructions } from './components/Instructions';
@@ -40,6 +39,7 @@ function App() {
     const [isLoadingVideos, setIsLoadingVideos] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isPosting, setIsPosting] = useState<string | null>(null); // null or the videoId being posted
+    const [postResults, setPostResults] = useState<PostResult | null>(null);
     const [videoActionBusyId, setVideoActionBusyId] = useState<string | null>(null);
 
     const [isPostingModalOpen, setIsPostingModalOpen] = useState(false);
@@ -297,6 +297,7 @@ function App() {
 
         setIsPosting(videoToPost.id);
         setError(null);
+        setPostResults(null);
         setIsPostingModalOpen(false);
 
         try {
@@ -309,18 +310,19 @@ function App() {
                     videoId: videoToPost.id,
                     conceptId: selectedConcept.googleDriveFolderId,
                     platforms: platforms,
-                    // Pass postDetailsOverride if it exists for this video
                     postDetailsOverride: videoToPost.postDetailsOverride,
                 }),
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.details || 'Failed to start post process.');
+                throw new Error(data.error || data.message || 'Failed to post video.');
             }
 
-            alert(`Successfully started posting process for "${videoToPost.name}". The video will be moved to 'Posted' shortly.`);
+            setPostResults(data.results);
 
+            // Refetch videos after a short delay to allow for file move to complete
             setTimeout(() => {
                 fetchVideos();
             }, 3000);
@@ -499,6 +501,32 @@ function App() {
                     <h4 className="font-bold">An Error Occurred</h4>
                     <p className="text-sm">{error}</p>
                     <button onClick={() => setError(null)} className="absolute top-2 right-2 text-red-200 hover:text-white font-bold text-xl">&times;</button>
+                </div>
+            )}
+            {postResults && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-800 rounded-lg shadow-xl p-6 max-w-lg w-full">
+                        <h3 className="text-2xl font-bold text-white mb-4">Posting Results</h3>
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                            {Object.entries(postResults).map(([platform, result]) => (
+                                <div key={platform} className={`p-4 rounded-lg border ${result.success ? 'border-green-600/50 bg-green-900/20' : 'border-red-600/50 bg-red-900/20'}`}>
+                                    <div className="flex items-center">
+                                        <span className={`mr-3 text-2xl ${result.success ? 'text-green-500' : 'text-red-500'}`}>
+                                            {result.success ? '✔' : '✖'}
+                                        </span>
+                                        <p className="font-semibold text-lg text-white">{platform}</p>
+                                    </div>
+                                    <p className={`text-sm mt-2 ${result.success ? 'text-green-300' : 'text-red-300'}`}>{result.message}</p>
+                                    {result.error && (
+                                        <p className="text-xs text-slate-400 mt-1 font-mono bg-slate-900 p-2 rounded-md">Error: {result.error}</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={() => setPostResults(null)} className="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                            Close
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

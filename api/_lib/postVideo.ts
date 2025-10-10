@@ -268,8 +268,11 @@ export async function performVideoPosting({
       const videoByteLength = videoBuffer.byteLength;
       const videoBody = Buffer.from(videoBuffer);
 
-      const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
-      const totalChunkCount = Math.ceil(videoByteLength / CHUNK_SIZE);
+      let chunkSize = 20 * 1024 * 1024; // 20MB
+      const totalChunkCount = Math.ceil(videoByteLength / chunkSize);
+      if (totalChunkCount === 1) {
+        chunkSize = videoByteLength;
+      }
 
       const uploadEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
       const uploadInitResponse = await fetch(uploadEndpoint, {
@@ -288,7 +291,7 @@ export async function performVideoPosting({
           source_info: {
             source: 'FILE_UPLOAD',
             video_size: videoByteLength,
-            chunk_size: CHUNK_SIZE,
+            chunk_size: chunkSize,
             total_chunk_count: totalChunkCount,
           },
         }),
@@ -389,7 +392,7 @@ export async function performVideoPosting({
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${instagramPageAccessToken}`,
+          'Authorization': `OAuth ${instagramPageAccessToken}`,
           'Content-Type': 'application/octet-stream',
           'Content-Length': String(videoBuffer.length),
         },
