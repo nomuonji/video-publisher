@@ -65,7 +65,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let enrichedTikTokTokens: TikTokTokens = { ...tiktokTokens };
-    if (tiktokTokens.access_token) {
+    const scopeString = tiktokTokens.scope || '';
+    const scopes = scopeString.split(/[ ,]/).map((item: string) => item.trim()).filter(Boolean);
+    const hasUserInfoScope = scopes.some((scope: string) =>
+      scope.startsWith('user.info') || scope === 'user.info.basic'
+    );
+
+    if (tiktokTokens.access_token && hasUserInfoScope) {
       try {
         const userInfoResponse = await fetch(
           'https://open.tiktokapis.com/v2/user/info/?fields=display_name,username,avatar_url',
@@ -94,6 +100,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (userInfoError) {
         console.error('Error while fetching TikTok user info:', userInfoError);
       }
+    } else if (!hasUserInfoScope) {
+      console.warn('TikTok token does not include user.info scope; skipping profile enrichment.');
     }
 
     // 2. Use user's Google token to update config.json on Google Drive
