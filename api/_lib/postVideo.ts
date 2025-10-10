@@ -3,7 +3,7 @@ import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import fetch from 'node-fetch';
 import type { ConceptConfig, TikTokTokens } from '../../types';
-import { withNormalizedPostingTimes } from '../../utils/schedule';
+import { withNormalizedPostingTimes } from '../../utils/schedule.js';
 
 // --- Authentication ---
 function getAuth(serviceAccountJson: string) {
