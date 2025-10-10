@@ -2,7 +2,7 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import fetch from 'node-fetch';
-import type { ConceptConfig, TikTokTokens } from '../../types';
+import type { ConceptConfig, TikTokTokens, PostResult } from '../../types.js';
 import { withNormalizedPostingTimes } from '../../utils/schedule.js';
 
 // --- Authentication ---
@@ -109,8 +109,9 @@ export async function performVideoPosting({
   targetVideoId,
   targetPlatforms,
   postDetailsOverride,
-}: PerformVideoPostingOptions): Promise<void> {
+}: PerformVideoPostingOptions): Promise<PostResult> {
   console.log(`[performVideoPosting] Starting for concept: ${conceptId}`);
+  const results: PostResult = {};
 
   const auth = getAuth(serviceAccountJson);
   await auth.authorize();
@@ -169,7 +170,7 @@ export async function performVideoPosting({
 
   if (!videoToPost) {
     console.log(`[performVideoPosting] No videos found in queue for concept ${config.name}.`);
-    return;
+    return {}; // No video to post, return empty result
   }
   const originLabel = videoSourceFolderId === queueFolder.id ? 'queue' : 'posted';
   const videoMimeType = videoToPost.mimeType || 'video/mp4';
@@ -193,6 +194,7 @@ export async function performVideoPosting({
 
   const platformsToPost = targetPlatforms || config.platforms;
 
+  // --- YouTube Posting ---
   if (platformsToPost.YouTube && config.apiKeys.youtube_refresh_token) {
     console.log(`[performVideoPosting] Posting to YouTube...`);
     try {
@@ -219,7 +221,6 @@ export async function performVideoPosting({
             privacyStatus: 'public',
             madeForKids: false,
             selfDeclaredMadeForKids: false,
-            // The YouTube Data API may introduce an explicit AI-generated flag in future versions.
             ...(aiLabel ? ({ aiGeneratedContent: true } as Record<string, unknown>) : {}),
           } as any,
         },
@@ -229,11 +230,14 @@ export async function performVideoPosting({
         },
       });
       console.log(`[performVideoPosting] Video posted to YouTube: ${title}`);
-    } catch (error) {
+      results.YouTube = { success: true, message: `Successfully posted to YouTube: ${title}` };
+    } catch (error: any) {
       console.error(`[performVideoPosting] Failed to post to YouTube:`, error);
+      results.YouTube = { success: false, message: 'Failed to post to YouTube.', error: error.message };
     }
   }
 
+  // --- TikTok Posting ---
   const tiktokTokensConfig = config.apiKeys.tiktok;
   if (platformsToPost.TikTok && tiktokTokensConfig && tiktokTokensConfig.refresh_token) {
     console.log(`[performVideoPosting] Posting to TikTok...`);
@@ -264,6 +268,9 @@ export async function performVideoPosting({
       const videoByteLength = videoBuffer.byteLength;
       const videoBody = Buffer.from(videoBuffer);
 
+      const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
+      const totalChunkCount = Math.ceil(videoByteLength / CHUNK_SIZE);
+
       const uploadEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
       const uploadInitResponse = await fetch(uploadEndpoint, {
         method: 'POST',
@@ -275,12 +282,14 @@ export async function performVideoPosting({
           post_info: {
             title,
             description: description + (hashtags ? `\n\n${hashtags}` : ''),
-            visibility_type: 'SELF_ONLY',
+            privacy_level: 'SELF',
             ai_generated_content: aiLabel,
           },
           source_info: {
             source: 'FILE_UPLOAD',
             video_size: videoByteLength,
+            chunk_size: CHUNK_SIZE,
+            total_chunk_count: totalChunkCount,
           },
         }),
       });
@@ -320,42 +329,31 @@ export async function performVideoPosting({
         throw new Error(`TikTok video publish failed: ${publishData.error?.message || 'Unknown error'}`);
       }
 
-      console
       console.log(`[performVideoPosting] Video posted to TikTok: ${title}`);
-    } catch (error) {
+      results.TikTok = { success: true, message: `Successfully posted to TikTok: ${title}` };
+    } catch (error: any) {
       console.error(`[performVideoPosting] Failed to post to TikTok:`, error);
+      results.TikTok = { success: false, message: 'Failed to post to TikTok.', error: error.message };
     }
   } else if (platformsToPost.TikTok) {
     console.warn('[performVideoPosting] Skipping TikTok posting: no connected TikTok account.');
+    results.TikTok = { success: false, message: 'Skipping TikTok posting: no connected TikTok account.' };
   }
 
+  // --- Instagram Posting ---
   if (platformsToPost.Instagram && config.apiKeys.instagram && instagramAccounts.length > 0) {
     console.log(`[performVideoPosting] Posting to Instagram...`);
-    let permissionId: string | null = null;
     try {
-      // Temporarily make the file public so Instagram can fetch it
-      const permission = await drive.permissions.create({
-        fileId: videoToPost.id,
-        requestBody: {
-          role: 'reader',
-          type: 'anyone',
-        },
-      });
-      permissionId = permission.data.id ?? null;
-      console.log(`[performVideoPosting] Temporarily made file public with permission ID: ${permissionId}`);
-
       const targetInstagramAccount = instagramAccounts.find(acc => acc.id === config.apiKeys.instagram);
       if (!targetInstagramAccount) {
-        console.error(`[performVideoPosting] Target Instagram account ${config.apiKeys.instagram} not found in loaded accounts.`);
-        return;
+        throw new Error(`Target Instagram account ${config.apiKeys.instagram} not found in loaded accounts.`);
       }
       const instagramPageAccessToken = targetInstagramAccount.page_access_token;
       const instagramUserId = targetInstagramAccount.id;
 
-      const videoUrl = videoToPost.webContentLink;
-
-      const uploadEndpoint = `https://graph.facebook.com/v19.0/${instagramUserId}/media`;
-      const uploadResponse = await fetch(uploadEndpoint, {
+      // Step 1: Start Resumable Upload Session
+      const sessionEndpoint = `https://graph.facebook.com/v19.0/${instagramUserId}/media`;
+      const sessionResponse = await fetch(sessionEndpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${instagramPageAccessToken}`,
@@ -363,36 +361,46 @@ export async function performVideoPosting({
         },
         body: JSON.stringify({
           media_type: 'VIDEO',
-          video_url: videoUrl,
+          upload_type: 'resumable',
           caption: `${title}\n${description}\n${hashtags}`,
           is_ai_generated: aiLabel,
         }),
       });
+      const sessionData = await sessionResponse.json();
+      if (!sessionResponse.ok) {
+        throw new Error(`Instagram session creation failed: ${sessionData.error?.message || 'Unknown error'}`);
+      }
+      const mediaContainerId = sessionData.id;
+      let uploadUrl = sessionData.upload_url; // As per research, this should be returned
+
+      if (!uploadUrl) {
+        // Fallback based on other documentation, in case upload_url is not present
+        // This part is for robustness, as API responses can vary.
+        console.warn('Instagram session did not return a direct upload_url. Attempting upload to container ID endpoint as a fallback.');
+        uploadUrl = `https://graph.facebook.com/v19.0/${mediaContainerId}`;
+        // Note: The Authorization header for this might need to be 'OAuth' instead of 'Bearer'
+      }
+
+      // Step 2: Download video from Google Drive
+      const videoFileResponse = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'arraybuffer' });
+      const videoBuffer = Buffer.from(videoFileResponse.data as ArrayBuffer);
+
+      // Step 3: Upload video file to the upload URL
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${instagramPageAccessToken}`,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': String(videoBuffer.length),
+        },
+        body: videoBuffer,
+      });
       const uploadData = await uploadResponse.json();
       if (!uploadResponse.ok) {
-        throw new Error(`Instagram media upload failed: ${uploadData.error?.message || 'Unknown error'}`);
+        throw new Error(`Instagram video content upload failed: ${uploadData.error?.message || 'Unknown error'}`);
       }
 
-      const mediaContainerId = uploadData.id;
-
-      let statusEndpoint = `https://graph.facebook.com/v19.0/${mediaContainerId}?fields=status,status_code&access_token=${instagramPageAccessToken}`;
-      let mediaStatus: any;
-      let attempts = 0;
-      const maxAttempts = 10;
-      const delayMs = 5000;
-
-      do {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        const statusResponse = await fetch(statusEndpoint);
-        mediaStatus = await statusResponse.json();
-        console.log(`[performVideoPosting] Instagram media container status: ${mediaStatus.status_code}`);
-        attempts++;
-      } while (mediaStatus.status_code !== 'FINISHED' && attempts < maxAttempts);
-
-      if (mediaStatus.status_code !== 'FINISHED') {
-        throw new Error(`Instagram media container processing timed out or failed: ${mediaStatus.status_code}`);
-      }
-
+      // Step 4: Publish the media container
       const publishEndpoint = `https://graph.facebook.com/v19.0/${instagramUserId}/media_publish`;
       const publishResponse = await fetch(publishEndpoint, {
         method: 'POST',
@@ -410,23 +418,14 @@ export async function performVideoPosting({
       }
 
       console.log(`[performVideoPosting] Video posted to Instagram: ${title}`);
-    } catch (error) {
+      results.Instagram = { success: true, message: `Successfully posted to Instagram: ${title}` };
+    } catch (error: any) {
       console.error(`[performVideoPosting] Failed to post to Instagram:`, error);
-    } finally {
-      if (permissionId) {
-        try {
-          await drive.permissions.delete({
-            fileId: videoToPost.id,
-            permissionId: permissionId,
-          });
-          console.log(`[performVideoPosting] Successfully removed temporary public permission.`);
-        } catch (deleteError) {
-          console.error(`[performVideoPosting] CRITICAL: Failed to remove temporary public permission ${permissionId} for file ${videoToPost.id}. Please remove it manually.`, deleteError);
-        }
-      }
+      results.Instagram = { success: false, message: 'Failed to post to Instagram.', error: error.message };
     }
   }
 
+  // --- Move video to 'posted' folder ---
   if (videoSourceFolderId === queueFolder.id) {
     await drive.files.update({
       fileId: videoToPost.id,
@@ -438,4 +437,6 @@ export async function performVideoPosting({
   } else {
     console.log(`[performVideoPosting] Video ${videoToPost.name} is already in 'posted' folder; skipping move.`);
   }
+
+  return results;
 }

@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON environment variable is not set.');
     }
 
-    await performVideoPosting({
+    const results = await performVideoPosting({
       conceptId,
       serviceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON!,
       targetVideoId: videoId,
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       postDetailsOverride,
     });
 
-    res.status(200).json({ message: 'Posting process initiated successfully.' });
+    res.status(200).json({ message: 'Posting process completed.', results });
   } catch (error: any) {
     console.error('Manual posting API failed:', error);
     res.status(500).json({ error: error.message || 'Failed to initiate posting process.' });

@@ -73,3 +73,16 @@ export interface PlatformInfo {
   icon: React.FC<React.SVGProps<SVGSVGElement>>;
   description: string;
 }
+
+// --- Result types for posting API ---
+export interface PlatformPostResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+export interface PostResult {
+  YouTube?: PlatformPostResult;
+  TikTok?: PlatformPostResult;
+  Instagram?: PlatformPostResult;
+}
