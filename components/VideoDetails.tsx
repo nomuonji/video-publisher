@@ -1,5 +1,7 @@
 import React from 'react';
 import type { ConceptConfig } from '../types';
+import { DEFAULT_POST_DETAILS } from '../types';
+import { cronFromTime, ensurePostingTimesFromConfig, normalizePostingTimesList, normalizeTimeString } from '../utils/schedule';
 import { TextInput } from './TextInput';
 
 interface VideoDetailsProps {
@@ -12,27 +14,37 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  // Parse cron string to get time
-  const [minute, hour] = config.schedule.split(' ');
+  const updatePostingTimes = (updater: (times: string[]) => string[]) => {
+    setConfig(prev => {
+      const currentTimes = ensurePostingTimesFromConfig(prev);
+      const updated = normalizePostingTimesList(updater(currentTimes));
+      const finalTimes =
+        updated.length > 0 ? updated : ensurePostingTimesFromConfig({ postingTimes: [] } as Partial<ConceptConfig>);
 
-  const handleTimeChange = (part: 'hour' | 'minute', value: string) => {
-    const numericValue = parseInt(value, 10);
-    if (isNaN(numericValue)) return;
+      return {
+        ...prev,
+        postingTimes: finalTimes,
+        schedule: cronFromTime(finalTimes[0]),
+      };
+    });
+  };
 
-    let newHour = hour;
-    let newMinute = minute;
+  const handlePostingTimeChange = (index: number, value: string) => {
+    const normalized = normalizeTimeString(value);
+    if (!normalized) return;
+    updatePostingTimes(times => {
+      const next = [...times];
+      next[index] = normalized;
+      return next;
+    });
+  };
 
-    if (part === 'hour') {
-      if (numericValue < 0 || numericValue > 23) return;
-      newHour = String(numericValue);
-    } else {
-      if (numericValue < 0 || numericValue > 59) return;
-      newMinute = String(numericValue);
-    }
+  const handleRemovePostingTime = (index: number) => {
+    updatePostingTimes(times => times.filter((_, idx) => idx !== index));
+  };
 
-    // Reconstruct the cron string for a daily schedule
-    const newSchedule = `${newMinute} ${newHour} * * *`;
-    setConfig(prev => ({ ...prev, schedule: newSchedule }));
+  const handleAddPostingTime = () => {
+    updatePostingTimes(times => [...times, '12:00']);
   };
 
   const handlePostDetailChange = (
@@ -42,6 +54,7 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
     setConfig(prev => ({
       ...prev,
       postDetails: {
+        ...DEFAULT_POST_DETAILS,
         ...prev.postDetails,
         [field]: value,
       },
@@ -49,7 +62,9 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
   };
 
   // Ensure postDetails is initialized
-  const currentPostDetails = config.postDetails || { title: '', description: '', hashtags: '', aiLabel: false };
+  const currentPostDetails = { ...DEFAULT_POST_DETAILS, ...(config.postDetails ?? {}) };
+  const postingTimes = ensurePostingTimesFromConfig(config);
+  const generatedCronPreview = postingTimes.length > 0 ? cronFromTime(postingTimes[0]) : '';
 
   return (
     <div className="space-y-4">
@@ -63,32 +78,45 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
       />
       
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">Posting Schedule (Daily)</label>
-        <div className="flex items-center gap-4">
-            <div className="w-1/2">
-                <TextInput
-                    id="scheduleHour"
-                    label="Hour (0-23)"
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={hour}
-                    onChange={(e) => handleTimeChange('hour', e.target.value)}
-                />
+        <label className="block text-sm font-medium text-slate-300 mb-1">Posting Times (Daily, UTC)</label>
+        <div className="space-y-2">
+          {postingTimes.map((time, index) => (
+            <div key={`${time}-${index}`} className="flex items-center gap-3">
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => handlePostingTimeChange(index, e.target.value)}
+                className="w-32 bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+              />
+              {postingTimes.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemovePostingTime(index)}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Remove
+                </button>
+              )}
             </div>
-            <div className="w-1/2">
-                <TextInput
-                    id="scheduleMinute"
-                    label="Minute (0-59)"
-                    type="number"
-                    min={0}
-                    max={59}
-                    value={minute}
-                    onChange={(e) => handleTimeChange('minute', e.target.value)}
-                />
-            </div>
+          ))}
         </div>
-        <p className="text-xs text-slate-500 mt-2">Schedule is in UTC. Current cron: <code>{config.schedule}</code></p>
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            type="button"
+            onClick={handleAddPostingTime}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            + Add time
+          </button>
+          {generatedCronPreview && (
+            <span className="text-xs text-slate-500">
+              First cron expression: <code>{generatedCronPreview}</code>
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 mt-2">
+          Times are interpreted in UTC. Each listed time triggers one publishing attempt per day.
+        </p>
       </div>
 
       {/* New Post Details Section */}

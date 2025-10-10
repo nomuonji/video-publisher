@@ -42,14 +42,6 @@ async function getFileContent(drive: any, fileId: string): Promise<any> {
 }
 
 // --- Helper function for formatting strings ---
-function formatString(format: string, context: Record<string, string>): string {
-  let result = format;
-  for (const key in context) {
-    result = result.replace(new RegExp(`{${key}}`, 'g'), context[key]);
-  }
-  return result;
-}
-
 // --- Helper function to refresh YouTube access token ---
 async function refreshYouTubeAccessToken(refreshToken: string): Promise<string> {
   const oauth2Client = new google.auth.OAuth2(
@@ -101,7 +93,7 @@ export async function performVideoPosting(
   conceptId: string,
   serviceAccountJson: string,
   targetVideoId?: string, // Optional: for manual posting of a specific video
-  targetPlatforms?: { YouTube?: boolean; TikTok?: boolean; boolean; Instagram?: boolean }, // Optional: for manual posting to specific platforms
+  targetPlatforms?: { YouTube?: boolean; TikTok?: boolean; Instagram?: boolean }, // Optional: for manual posting to specific platforms
   postDetailsOverride?: ConceptConfig['postDetails'] // Add this
 ) {
   console.log(`[performVideoPosting] Starting for concept: ${conceptId}`);
@@ -139,13 +131,23 @@ export async function performVideoPosting(
   if (!queueFolder) {
     throw new Error(`Queue folder not found for concept ${conceptId}`);
   }
-  const videosInQueue = await getVideosInFolder(drive, queueFolder.id!); // Assuming getVideosInFolder is defined
+  const postedFolder = await getFileByName(drive, conceptId, 'posted');
+  if (!postedFolder) {
+    throw new Error(`Posted folder not found for concept ${conceptId}`);
+  }
+  const videosInQueue = await getVideosInFolder(drive, queueFolder.id!);
 
   let videoToPost;
+  let videoSourceFolderId = queueFolder.id!;
   if (targetVideoId) {
     videoToPost = videosInQueue.find((v: any) => v.id === targetVideoId);
     if (!videoToPost) {
-      throw new Error(`Video with ID ${targetVideoId} not found in queue for concept ${conceptId}.`);
+      const videosInPosted = await getVideosInFolder(drive, postedFolder.id!);
+      videoToPost = videosInPosted.find((v: any) => v.id === targetVideoId);
+      if (!videoToPost) {
+        throw new Error(`Video with ID ${targetVideoId} not found in queue or posted folder for concept ${conceptId}.`);
+      }
+      videoSourceFolderId = postedFolder.id!;
     }
   } else {
     // For scheduled posts, pick the oldest video in the queue
@@ -156,18 +158,17 @@ export async function performVideoPosting(
     console.log(`[performVideoPosting] No videos found in queue for concept ${config.name}.`);
     return;
   }
-  console.log(`[performVideoPosting] Selected video to post: ${videoToPost.name} (ID: ${videoToPost.id})`);
+  const originLabel = videoSourceFolderId === queueFolder.id ? 'queue' : 'posted';
+  const videoMimeType = videoToPost.mimeType || 'video/mp4';
+  console.log(`[performVideoPosting] Selected video to post: ${videoToPost.name} (ID: ${videoToPost.id}) from ${originLabel} folder.`);
 
   // Prepare context for formatting
-  const formatContext = {
-    video_name: videoToPost.name,
-    concept_name: config.name,
-    concept_name_tag: config.name.replace(/\s/g, ''), // For hashtags
-    // TODO: Add other context variables as needed (e.g., youtube_link, description_from_drive, hashtags_from_drive)
-  };
-
   // Determine effective post details (override if present, else concept default)
-  const effectivePostDetails = videoToPost.postDetailsOverride || config.postDetails;
+  const effectivePostDetails = {
+    ...config.postDetails,
+    ...(videoToPost.postDetailsOverride ?? {}),
+    ...(postDetailsOverride ?? {}),
+  };
 
   // Generate title, description, hashtags
   const title = effectivePostDetails.title;
@@ -192,7 +193,8 @@ export async function performVideoPosting(
       const youtube = google.youtube({ version: 'v3', auth: youtubeOAuth2Client });
 
       // Download video file from Drive
-      const videoFile = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'stream' });
+      const videoFileResponse = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'stream' });
+      const videoStream = videoFileResponse.data as any;
 
       await youtube.videos.insert({
         part: ['snippet', 'status'],
@@ -200,7 +202,10 @@ export async function performVideoPosting(
           snippet: {
             title: title,
             description: description,
-            tags: hashtags.split(' ').filter(tag => tag.startsWith('#')).map(tag => tag.substring(1)), // Assuming hashtags are space-separated and start with #
+            tags: hashtags
+              .split(' ')
+              .filter((tag: string) => tag.startsWith('#'))
+              .map((tag: string) => tag.substring(1)), // Assuming hashtags are space-separated and start with #
             // categoryId: '22', // People & Blogs, or get from config
           },
           status: {
@@ -208,8 +213,8 @@ export async function performVideoPosting(
           },
         },
         media: {
-          mimeType: videoToPost.mimeType,
-          body: videoFile.data,
+          mimeType: videoMimeType,
+          body: videoStream,
         },
       });
       console.log(`[performVideoPosting] Video posted to YouTube: ${title}`);
@@ -217,17 +222,19 @@ export async function performVideoPosting(
       console.error(`[performVideoPosting] Failed to post to YouTube:`, error);
     }
   }
-  if (platformsToPost.TikTok && config.apiKeys.tiktok) {
+  const tiktokTokensConfig = config.apiKeys.tiktok;
+  if (platformsToPost.TikTok && tiktokTokensConfig && tiktokTokensConfig.refresh_token) {
     console.log(`[performVideoPosting] Posting to TikTok...`);
     try {
-      let currentTikTokTokens = config.apiKeys.tiktok;
+      let currentTikTokTokens: TikTokTokens = { ...tiktokTokensConfig };
       // Check if token is expired (simple check, could be more robust)
       // TikTok access tokens are valid for 24 hours, refresh tokens for 365 days.
       // We'll refresh if access token is near expiration (e.g., less than 1 hour remaining).
-      if (currentTikTokTokens.expires_in < 3600) { 
+      if (typeof currentTikTokTokens.expires_in === 'number' && currentTikTokTokens.expires_in < 3600) { 
         console.log('[performVideoPosting] Refreshing TikTok access token...');
         const oldTikTokTokens = currentTikTokTokens; // Keep old tokens for comparison
-        currentTikTokTokens = await refreshTikTokAccessToken(currentTikTokTokens);
+        const refreshedTokens = await refreshTikTokAccessToken(currentTikTokTokens);
+        currentTikTokTokens = { ...currentTikTokTokens, ...refreshedTokens };
         
         // Save updated tiktokTokens back to config.json
         if (JSON.stringify(oldTikTokTokens) !== JSON.stringify(currentTikTokTokens)) { // Only update if tokens actually changed
@@ -245,7 +252,10 @@ export async function performVideoPosting(
       }
 
       // Download video file from Drive
-      const videoFile = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'arraybuffer' }); // TikTok needs ArrayBuffer
+      const videoFileResponse = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'arraybuffer' });
+      const videoBuffer = videoFileResponse.data as ArrayBuffer;
+      const videoByteLength = videoBuffer.byteLength;
+      const videoBody = Buffer.from(videoBuffer);
 
       // 1. Upload video to TikTok
       const uploadEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
@@ -265,7 +275,7 @@ export async function performVideoPosting(
           },
           source_info: {
             source: 'PULL_FROM_URL', // Or 'UPLOAD_LOCAL_FILE'
-            video_size: videoFile.data.byteLength,
+            video_size: videoByteLength,
             // video_url: videoToPost.webContentLink, // If using PULL_FROM_URL
           },
         }),
@@ -282,10 +292,10 @@ export async function performVideoPosting(
       const uploadContentResponse = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
-          'Content-Range': `bytes 0-${videoFile.data.byteLength - 1}/${videoFile.data.byteLength}`,
-          'Content-Type': videoToPost.mimeType,
+          'Content-Range': `bytes 0-${videoByteLength - 1}/${videoByteLength}`,
+          'Content-Type': videoMimeType,
         },
-        body: videoFile.data, // ArrayBuffer
+        body: videoBody,
       });
       if (!uploadContentResponse.ok) {
         throw new Error(`TikTok video content upload failed: ${uploadContentResponse.statusText}`);
@@ -313,6 +323,8 @@ export async function performVideoPosting(
     } catch (error) {
       console.error(`[performVideoPosting] Failed to post to TikTok:`, error);
     }
+  } else if (platformsToPost.TikTok) {
+    console.warn('[performVideoPosting] Skipping TikTok posting: no connected TikTok account.');
   }
   if (platformsToPost.Instagram && config.apiKeys.instagram && instagramAccounts.length > 0) {
     console.log(`[performVideoPosting] Posting to Instagram...`);
@@ -402,18 +414,18 @@ export async function performVideoPosting(
     }
   }
 
-  // 5. Move video to 'posted' folder
-  const postedFolder = await getFileByName(drive, conceptId, 'posted');
-  if (!postedFolder) {
-    throw new Error(`Posted folder not found for concept ${conceptId}`);
+  // 5. Move video to 'posted' folder if needed
+  if (videoSourceFolderId === queueFolder.id) {
+    await drive.files.update({
+      fileId: videoToPost.id,
+      addParents: postedFolder.id,
+      removeParents: queueFolder.id,
+      fields: 'id, parents',
+    });
+    console.log(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder.`);
+  } else {
+    console.log(`[performVideoPosting] Video ${videoToPost.name} is already in 'posted' folder; skipping move.`);
   }
-  await drive.files.update({
-    fileId: videoToPost.id,
-    addParents: postedFolder.id,
-    removeParents: queueFolder.id,
-    fields: 'id, parents',
-  });
-  console.log(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder.`);
 }
 
 // --- Script entry point (for scheduled runs) ---

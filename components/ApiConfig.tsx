@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import type { ConceptConfig } from '../types';
 
-
 interface ApiConfigProps {
     conceptId: string;
     config: ConceptConfig;
@@ -12,10 +11,22 @@ interface ApiConfigProps {
     accessToken: string | null;
 }
 
-export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConfig, onRefresh, onSave, instagramAccounts, accessToken }) => {
-
+export const ApiConfig: React.FC<ApiConfigProps> = ({
+    conceptId,
+    config,
+    setConfig,
+    onRefresh,
+    onSave,
+    instagramAccounts,
+    accessToken,
+}) => {
     const isYouTubeConnected = !!config.apiKeys.youtube_refresh_token;
-    const isTikTokConnected = !!config.apiKeys.tiktok;
+    const youtubeAccountName = config.apiKeys.youtube_channel_name || config.apiKeys.youtube_channel_id || null;
+
+    const tiktokTokens = config.apiKeys.tiktok;
+    const isTikTokConnected = !!tiktokTokens && !!tiktokTokens.access_token;
+    const tiktokAccountName = tiktokTokens?.display_name || tiktokTokens?.username || tiktokTokens?.open_id || null;
+
     const hasInstagramConnections = instagramAccounts && instagramAccounts.length > 0;
     const selectedInstagramId = config.apiKeys.instagram;
 
@@ -33,7 +44,8 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
     }, [onRefresh]);
 
     const openAuthPopup = (url: string) => {
-        const width = 600, height = 700;
+        const width = 600;
+        const height = 700;
         const left = window.screen.width / 2 - width / 2;
         const top = window.screen.height / 2 - height / 2;
         window.open(url, '_blank', `width=${width},height=${height},top=${top},left=${left}`);
@@ -41,21 +53,23 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
 
     const handleConnectYouTube = () => {
         if (!accessToken) {
-            alert("Authentication error: Google access token is missing.");
+            alert('Authentication error: Google access token is missing.');
             return;
         }
         openAuthPopup(`/api/auth/start?conceptId=${conceptId}&accessToken=${accessToken}`);
     };
+
     const handleConnectTikTok = () => {
         if (!accessToken) {
-            alert("Authentication error: Google access token is missing.");
+            alert('Authentication error: Google access token is missing.');
             return;
         }
         openAuthPopup(`/api/auth/tiktok/start?conceptId=${conceptId}&accessToken=${accessToken}`);
     };
+
     const handleConnectInstagram = () => {
         if (!accessToken) {
-            alert("Authentication error: Google access token is missing.");
+            alert('Authentication error: Google access token is missing.');
             return;
         }
         openAuthPopup(`/api/auth/instagram/start?conceptId=${conceptId}&accessToken=${accessToken}`);
@@ -63,15 +77,36 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
 
     const handleDisconnect = (platform: 'youtube' | 'tiktok' | 'instagram') => {
         if (!window.confirm(`Are you sure you want to disconnect ${platform}?`)) return;
-        
-        let newConfig;
+
+        let newConfig: ConceptConfig;
         if (platform === 'youtube') {
-            const newApiKeys = { ...config.apiKeys };
-            delete newApiKeys.youtube_refresh_token;
-            newConfig = { ...config, apiKeys: newApiKeys };
+            newConfig = {
+                ...config,
+                apiKeys: {
+                    ...config.apiKeys,
+                    youtube_refresh_token: '',
+                    youtube_channel_id: '',
+                    youtube_channel_name: '',
+                },
+            };
+        } else if (platform === 'tiktok') {
+            newConfig = {
+                ...config,
+                apiKeys: {
+                    ...config.apiKeys,
+                    tiktok: null,
+                },
+            };
         } else {
-            newConfig = { ...config, apiKeys: { ...config.apiKeys, [platform]: '' } };
+            newConfig = {
+                ...config,
+                apiKeys: {
+                    ...config.apiKeys,
+                    instagram: '',
+                },
+            };
         }
+
         setConfig(newConfig);
         onSave(newConfig);
     };
@@ -82,22 +117,35 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
         onSave(newConfig);
     };
 
-
-
     return (
         <div className="space-y-4">
             <h3 className="text-lg font-semibold text-slate-200">API Keys & Secrets</h3>
-            
+
             {/* YouTube Connection */}
             <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
                 <h4 className="font-semibold text-slate-200 mb-2">YouTube Account</h4>
                 {isYouTubeConnected ? (
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-green-400">✓ Connected</p>
-                        <button onClick={() => handleDisconnect('youtube')} className="text-xs text-red-400 hover:underline">Disconnect</button>
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-sm text-green-400">Connected</p>
+                            <p className="text-xs text-slate-300">
+                                Channel: {youtubeAccountName || 'Unavailable'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => handleDisconnect('youtube')}
+                            className="text-xs text-red-400 hover:underline"
+                        >
+                            Disconnect
+                        </button>
                     </div>
                 ) : (
-                    <button onClick={handleConnectYouTube} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Connect with YouTube</button>
+                    <button
+                        onClick={handleConnectYouTube}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md"
+                    >
+                        Connect with YouTube
+                    </button>
                 )}
             </div>
 
@@ -105,12 +153,27 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
             <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
                 <h4 className="font-semibold text-slate-200 mb-2">TikTok Account</h4>
                 {isTikTokConnected ? (
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-green-400">✓ Connected</p>
-                        <button onClick={() => handleDisconnect('tiktok')} className="text-xs text-red-400 hover:underline">Disconnect</button>
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-sm text-green-400">Connected</p>
+                            <p className="text-xs text-slate-300">
+                                Account: {tiktokAccountName || 'Unavailable'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => handleDisconnect('tiktok')}
+                            className="text-xs text-red-400 hover:underline"
+                        >
+                            Disconnect
+                        </button>
                     </div>
                 ) : (
-                    <button onClick={handleConnectTikTok} className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-md">Connect with TikTok</button>
+                    <button
+                        onClick={handleConnectTikTok}
+                        className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-md"
+                    >
+                        Connect with TikTok
+                    </button>
                 )}
             </div>
 
@@ -119,24 +182,40 @@ export const ApiConfig: React.FC<ApiConfigProps> = ({ conceptId, config, setConf
                 <h4 className="font-semibold text-slate-200 mb-2">Instagram Account</h4>
                 {hasInstagramConnections ? (
                     <div>
-                        <label htmlFor="instagram-select" className="text-sm text-slate-400 mb-1 block">Select account to post to:</label>
-                        <select 
+                        <label htmlFor="instagram-select" className="text-sm text-slate-400 mb-1 block">
+                            Select account to post to:
+                        </label>
+                        <select
                             id="instagram-select"
                             value={selectedInstagramId || ''}
                             onChange={handleInstagramAccountSelect}
                             className="w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
                         >
-                            <option value="" disabled>-- Select an Account --</option>
-                            {instagramAccounts.map(acc => (
-                                <option key={acc.id} value={acc.id}>{acc.name} (@{acc.username})</option>
+                            <option value="" disabled>
+                                -- Select an Account --
+                            </option>
+                            {instagramAccounts.map((acc: any) => (
+                                <option key={acc.id} value={acc.id}>
+                                    {acc.name} (@{acc.username})
+                                </option>
                             ))}
                         </select>
-                        <button onClick={handleConnectInstagram} className="text-xs text-sky-400 hover:underline mt-2">Refresh/Reconnect</button>
+                        <button
+                            onClick={handleConnectInstagram}
+                            className="text-xs text-sky-400 hover:underline mt-2"
+                        >
+                            Refresh/Reconnect
+                        </button>
                     </div>
                 ) : (
-                    <button onClick={handleConnectInstagram} className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:opacity-90 text-white font-bold py-2 px-4 rounded-md">Connect with Instagram</button>
+                    <button
+                        onClick={handleConnectInstagram}
+                        className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:opacity-90 text-white font-bold py-2 px-4 rounded-md"
+                    >
+                        Connect with Instagram
+                    </button>
                 )}
             </div>
         </div>
     );
-}
+};

@@ -1,4 +1,5 @@
 import type { VideoFile, Concept, ConceptConfig } from '../types';
+import { withNormalizedPostingTimes } from '../utils/schedule';
 
 // --- In-Memory Mock Database ---
 
@@ -12,29 +13,26 @@ const createMockVideo = (id: number, name: string): VideoFile => ({
   webViewLink: '#',
 });
 
-const createDefaultConfig = (name: string): ConceptConfig => ({
-  name: name,
-  schedule: '0 8 * * *',
-  platforms: { YouTube: true, TikTok: true, Instagram: false },
-  apiKeys: {
-    tiktok: {
-      access_token: '',
-      expires_in: 0,
-      open_id: '',
-      refresh_expires_in: 0,
-      refresh_token: '',
-      scope: '',
-      token_type: '',
+const createDefaultConfig = (name: string): ConceptConfig =>
+  withNormalizedPostingTimes({
+    name: name,
+    schedule: '0 8 * * *',
+    postingTimes: ['08:00'],
+    platforms: { YouTube: true, TikTok: true, Instagram: false },
+    apiKeys: {
+      youtube_refresh_token: '',
+      youtube_channel_id: '',
+      youtube_channel_name: '',
+      tiktok: null,
+      instagram: '',
     },
-    instagram: '',
-  },
-  postDetails: {
-    title: '{video_name}',
-    description: '{video_name}',
-    hashtags: '{concept_name_tag}',
-    aiLabel: false,
-  },
-});
+    postDetails: {
+      title: '{video_name}',
+      description: '{video_name}',
+      hashtags: '{concept_name_tag}',
+      aiLabel: false,
+    },
+  } as ConceptConfig);
 
 const createNewConceptInDB = (name: string): Concept => {
   const conceptId = `mock_concept_${Date.now()}`;
@@ -124,7 +122,7 @@ export const deleteConcept = async (_accessToken: string, conceptId: string): Pr
     return Promise.resolve();
 };
 
-export const updateConceptConfig = async (_accessToken: string, conceptId: string, config: ConceptConfig): Promise<void> => {
+export const updateConceptConfig = async (_accessToken: string, conceptId: string, config: ConceptConfig): Promise<ConceptConfig> => {
     console.log(`MOCK: Updating config for "${conceptId}"...`);
     await delay(400);
     const conceptFolder = mockDatabase[conceptId];
@@ -133,12 +131,14 @@ export const updateConceptConfig = async (_accessToken: string, conceptId: strin
     const configId = conceptFolder.children.find((id: string) => id.endsWith('config.json'));
     if (!configId) throw new Error("Config file not found");
 
-    mockDatabase[configId].content = JSON.parse(JSON.stringify(config)); // Store a deep copy
+    const normalizedConfig = withNormalizedPostingTimes(config);
+
+    mockDatabase[configId].content = JSON.parse(JSON.stringify(normalizedConfig)); // Store a deep copy
     
     // Also update the folder name if the config name changed
-    mockDatabase[conceptId].name = config.name;
+    mockDatabase[conceptId].name = normalizedConfig.name;
 
-    return Promise.resolve();
+    return normalizedConfig;
 };
 
 
@@ -158,4 +158,33 @@ export const listVideos = async (_accessToken: string, folderId: string): Promis
         webViewLink: videoData.webViewLink,
     };
   });
+};
+
+export const moveVideo = async (_accessToken: string, videoId: string, sourceFolderId: string, targetFolderId: string): Promise<void> => {
+  console.log(`MOCK: Moving video "${videoId}" from ${sourceFolderId} to ${targetFolderId}...`);
+  await delay(300);
+  const source = mockDatabase[sourceFolderId];
+  const target = mockDatabase[targetFolderId];
+  if (!source || !target) {
+    throw new Error('Source or target folder not found');
+  }
+  const index = source.children.indexOf(videoId);
+  if (index === -1) {
+    throw new Error('Video not found in source folder');
+  }
+  source.children.splice(index, 1);
+  if (!target.children.includes(videoId)) {
+    target.children.push(videoId);
+  }
+};
+
+export const deleteVideo = async (_accessToken: string, videoId: string): Promise<void> => {
+  console.log(`MOCK: Deleting video "${videoId}"...`);
+  await delay(200);
+  Object.values(mockDatabase).forEach((entry: any) => {
+    if (entry?.children && Array.isArray(entry.children)) {
+      entry.children = entry.children.filter((childId: string) => childId !== videoId);
+    }
+  });
+  delete mockDatabase[videoId];
 };

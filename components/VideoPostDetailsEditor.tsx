@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { VideoFile, ConceptConfig } from '../types';
+import { DEFAULT_POST_DETAILS } from '../types';
 import { TextInput } from './TextInput';
 import { Card } from './Card';
 
@@ -11,6 +12,11 @@ interface VideoPostDetailsEditorProps {
   isOpen: boolean;
 }
 
+const buildPostDetails = (details?: Partial<ConceptConfig['postDetails']> | null) => ({
+  ...DEFAULT_POST_DETAILS,
+  ...(details ?? {}),
+});
+
 export const VideoPostDetailsEditor: React.FC<VideoPostDetailsEditorProps> = ({
   video,
   conceptDefaultPostDetails,
@@ -18,14 +24,14 @@ export const VideoPostDetailsEditor: React.FC<VideoPostDetailsEditorProps> = ({
   onClose,
   isOpen,
 }) => {
-  const [editedPostDetails, setEditedPostDetails] = useState<ConceptConfig['postDetails']>(
-    video.postDetailsOverride || conceptDefaultPostDetails
+  const [editedPostDetails, setEditedPostDetails] = useState<ConceptConfig['postDetails']>(() =>
+    buildPostDetails(video.postDetailsOverride ?? conceptDefaultPostDetails)
   );
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset state when video or conceptDefaultPostDetails changes
   useEffect(() => {
-    setEditedPostDetails(video.postDetailsOverride || conceptDefaultPostDetails);
+    setEditedPostDetails(buildPostDetails(video.postDetailsOverride ?? conceptDefaultPostDetails));
   }, [video, conceptDefaultPostDetails]);
 
   if (!isOpen) return null;

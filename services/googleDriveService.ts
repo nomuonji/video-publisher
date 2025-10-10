@@ -1,5 +1,5 @@
-import { google } from 'googleapis';
 import type { VideoFile, Concept, ConceptConfig } from '../types';
+import { withNormalizedPostingTimes } from '../utils/schedule';
 
 const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -44,30 +44,38 @@ const getVStockFolderId = async (accessToken: string): Promise<string> => {
 };
 
 const createSubFolder = async (accessToken: string, name: string, parentId: string): Promise<string> => {
-    const auth = new google.auth.OAuth2();
-    auth.setCredentials({ access_token: accessToken });
-    const drive = google.drive({ version: 'v3', auth });
-
     const fileMetadata = {
-        name: name,
+        name,
         mimeType: 'application/vnd.google-apps.folder',
         parents: [parentId],
     };
 
-    const res = await drive.files.create({
-        requestBody: fileMetadata,
-        fields: 'id',
-    });
-    const folderId = res.data.id!;
+    const createOptions = {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fileMetadata),
+    };
 
-    // Make the folder public
-    await drive.permissions.create({
-        fileId: folderId,
-        requestBody: {
+    const createdFile = await apiFetch(`${DRIVE_API_URL}?fields=id`, createOptions);
+    const folderId = createdFile.id as string;
+
+    const permissionsUrl = `${DRIVE_API_URL}/${folderId}/permissions`;
+    const permissionsOptions = {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
             role: 'reader',
             type: 'anyone',
-        },
-    });
+        }),
+    };
+
+    await apiFetch(permissionsUrl, permissionsOptions);
 
     return folderId;
 };
@@ -122,7 +130,8 @@ export const listConceptFolders = async (accessToken: string): Promise<Concept[]
         const configUrl = `${DRIVE_API_URL}/${configFile.id}?alt=media`;
         const configResponse = await fetch(configUrl, options);
         if (!configResponse.ok) return null;
-        const config: ConceptConfig = await configResponse.json();
+        const rawConfig: ConceptConfig = await configResponse.json();
+        const config = withNormalizedPostingTimes(rawConfig);
 
         return {
             googleDriveFolderId: folder.id,
@@ -144,20 +153,16 @@ export const createConcept = async (accessToken: string, name: string): Promise<
     const queueFolderId = await createSubFolder(accessToken, 'queue', conceptFolderId);
     const postedFolderId = await createSubFolder(accessToken, 'posted', conceptFolderId);
     
-    const defaultConfig: ConceptConfig = {
+    const defaultConfig: ConceptConfig = withNormalizedPostingTimes({
       name: name,
       schedule: '0 8 * * *',
+      postingTimes: ['08:00'],
       platforms: { YouTube: true, TikTok: true, Instagram: false },
       apiKeys: {
-        tiktok: {
-          access_token: '',
-          expires_in: 0,
-          open_id: '',
-          refresh_expires_in: 0,
-          refresh_token: '',
-          scope: '',
-          token_type: '',
-        },
+        youtube_refresh_token: '',
+        youtube_channel_id: '',
+        youtube_channel_name: '',
+        tiktok: null,
         instagram: '',
       },
       postDetails: {
@@ -166,7 +171,7 @@ export const createConcept = async (accessToken: string, name: string): Promise<
         hashtags: '{concept_name_tag}',
         aiLabel: false,
       },
-    };
+    } as ConceptConfig);
 
     await createConfigFile(accessToken, defaultConfig, conceptFolderId);
 
@@ -192,7 +197,9 @@ export const deleteConcept = async (accessToken: string, conceptId: string): Pro
     }
 };
 
-export const updateConceptConfig = async (accessToken: string, conceptId: string, config: ConceptConfig): Promise<void> => {
+export const updateConceptConfig = async (accessToken: string, conceptId: string, config: ConceptConfig): Promise<ConceptConfig> => {
+    const normalizedConfig = withNormalizedPostingTimes(config);
+
     const listUrl = `${DRIVE_API_URL}?q='${conceptId}' in parents and name='config.json' and trashed=false&fields=files(id)`;
     const listOptions = { headers: { 'Authorization': `Bearer ${accessToken}` } };
     const data = await apiFetch(listUrl, listOptions);
@@ -209,7 +216,7 @@ export const updateConceptConfig = async (accessToken: string, conceptId: string
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(config, null, 2),
+        body: JSON.stringify(normalizedConfig, null, 2),
     };
     await apiFetch(uploadUrl, uploadOptions);
     
@@ -220,9 +227,11 @@ export const updateConceptConfig = async (accessToken: string, conceptId: string
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name: config.name }),
+        body: JSON.stringify({ name: normalizedConfig.name }),
     };
     await apiFetch(updateUrl, updateOptions);
+
+    return normalizedConfig;
 };
 
 export const listVideos = async (accessToken: string, folderId: string): Promise<VideoFile[]> => {
@@ -264,6 +273,39 @@ export const updateVideoPostDetails = async (accessToken: string, videoId: strin
         }),
     };
     await apiFetch(url, options);
+};
+
+export const moveVideo = async (accessToken: string, videoId: string, sourceFolderId: string, targetFolderId: string): Promise<void> => {
+    const params = new URLSearchParams({
+        addParents: targetFolderId,
+        removeParents: sourceFolderId,
+        fields: 'id, parents',
+    });
+    const url = `${DRIVE_API_URL}/${videoId}?${params.toString()}`;
+    const options = {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+    };
+    await apiFetch(url, options);
+};
+
+export const deleteVideo = async (accessToken: string, videoId: string): Promise<void> => {
+    const url = `${DRIVE_API_URL}/${videoId}`;
+    const options = {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+        },
+    };
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(`Google Drive API Error: ${errorData.error?.message || errorData.message}`);
+    }
 };
 
 export const getInstagramAccounts = async (accessToken: string): Promise<any[]> => {

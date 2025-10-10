@@ -1,9 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import fetch from 'node-fetch';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
+import type { TikTokTokens } from '../../../types';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -60,9 +59,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: params.toString(),
     });
 
-    const tiktokTokens = await tokenResponse.json();
+    const tiktokTokens = (await tokenResponse.json()) as TikTokTokens & Record<string, any>;
     if (!tokenResponse.ok) {
       throw new Error(`TikTok token exchange failed: ${tiktokTokens.error_description || 'Unknown error'}`);
+    }
+
+    let enrichedTikTokTokens: TikTokTokens = { ...tiktokTokens };
+    if (tiktokTokens.access_token) {
+      try {
+        const userInfoResponse = await fetch(
+          'https://open.tiktokapis.com/v2/user/info/?fields=display_name,username,avatar_url',
+          {
+            headers: {
+              Authorization: `Bearer ${tiktokTokens.access_token}`,
+            },
+          }
+        );
+
+        if (userInfoResponse.ok) {
+          const userInfo = await userInfoResponse.json();
+          const user = userInfo?.data?.user ?? userInfo?.data;
+          if (user) {
+            enrichedTikTokTokens = {
+              ...enrichedTikTokTokens,
+              display_name: user.display_name ?? enrichedTikTokTokens.display_name,
+              username: user.username ?? enrichedTikTokTokens.username,
+              avatar_url: user.avatar_url ?? enrichedTikTokTokens.avatar_url,
+            };
+          }
+        } else {
+          const errorBody = await userInfoResponse.text();
+          console.error('Failed to fetch TikTok user info:', errorBody);
+        }
+      } catch (userInfoError) {
+        console.error('Error while fetching TikTok user info:', userInfoError);
+      }
     }
 
     // 2. Use user's Google token to update config.json on Google Drive
@@ -90,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...currentConfig,
         apiKeys: {
             ...currentConfig.apiKeys,
-            tiktok: tiktokTokens, // Store the full token object directly
+            tiktok: enrichedTikTokTokens, // Store the full token object with profile info
         }
     };
 

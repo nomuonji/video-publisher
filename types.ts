@@ -17,6 +17,9 @@ export interface TikTokTokens {
   refresh_token: string;
   scope: string;
   token_type: string;
+  display_name?: string;
+  username?: string;
+  avatar_url?: string;
 }
 
 // Represents the platforms selected for posting
@@ -30,12 +33,14 @@ export interface SelectedPlatforms {
 // Represents the configuration for a single concept, stored in config.json
 export interface ConceptConfig {
   name: string;
-  schedule: string; // e.g., '0 8 * * *' (cron format)
+  schedule?: string; // legacy cron format (optional)
+  postingTimes: string[]; // Daily posting times in HH:mm (UTC)
   platforms: SelectedPlatforms;
   apiKeys: {
     youtube_refresh_token?: string; // For server-side publishing
     youtube_channel_id?: string;
-    tiktok: TikTokTokens;
+    youtube_channel_name?: string;
+    tiktok?: TikTokTokens | null;
     instagram: string;
   };
   postDetails: {
@@ -45,6 +50,13 @@ export interface ConceptConfig {
     aiLabel: boolean;
   };
 }
+
+export const DEFAULT_POST_DETAILS: ConceptConfig['postDetails'] = {
+  title: '',
+  description: '',
+  hashtags: '',
+  aiLabel: false,
+};
 
 // Represents a full concept, which is a folder in Google Drive
 export interface Concept {

@@ -45,6 +45,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Refresh token not granted. Please ensure you are providing consent.');
     }
 
+    youtubeOAuth2Client.setCredentials({
+        refresh_token: refreshToken,
+        access_token: tokens.access_token || undefined,
+    });
+
     // 2. Use user's Google token (from state) to update config.json on Google Drive
     const driveOAuth2Client = new google.auth.OAuth2();
     driveOAuth2Client.setCredentials({ access_token: accessToken });
@@ -65,12 +70,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const contentRes = await drive.files.get({ fileId: configFile.id, alt: 'media' }, { responseType: 'json' });
     const currentConfig = contentRes.data;
 
+    let youtubeChannelId = currentConfig?.apiKeys?.youtube_channel_id || '';
+    let youtubeChannelName = currentConfig?.apiKeys?.youtube_channel_name || '';
+
+    try {
+        const youtube = google.youtube({ version: 'v3', auth: youtubeOAuth2Client });
+        const channelRes = await youtube.channels.list({
+            part: ['snippet'],
+            mine: true,
+        });
+        const channel = channelRes.data.items?.[0];
+        if (channel) {
+            youtubeChannelId = channel.id || youtubeChannelId;
+            youtubeChannelName = channel.snippet?.title || youtubeChannelName;
+        }
+    } catch (channelError) {
+        console.error('Failed to fetch YouTube channel info:', channelError);
+    }
+
     // Update config with the new refresh token
     const newConfig = {
         ...currentConfig,
         apiKeys: {
             ...currentConfig.apiKeys,
             youtube_refresh_token: refreshToken,
+            youtube_channel_id: youtubeChannelId,
+            youtube_channel_name: youtubeChannelName,
         }
     };
 

@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
-import parser from 'cron-parser';
 import { spawn } from 'child_process';
+import type { ConceptConfig } from '../types';
+import { ensurePostingTimesFromConfig } from '../utils/schedule';
 
 // --- Authentication ---
 function getAuth() {
@@ -22,7 +23,7 @@ async function main() {
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
   const executionTime = new Date();
-  const executedJobs: { name: string; schedule: string; executedAt: string }[] = [];
+  const executedJobs: { name: string; time: string; executedAt: string }[] = [];
 
   // 1. Find the main 'v-stock' folder
   const vStockFolderId = await getFolderIdByName(drive, 'v-stock');
@@ -43,60 +44,58 @@ async function main() {
       continue;
     }
 
-    const config = await getFileContent(drive, configFile.id!);
-    if (!config.schedule) {
-      console.log(`- Skipping concept '${config.name || folder.name}': schedule not defined in config.`);
+    const config = (await getFileContent(drive, configFile.id!)) as ConceptConfig;
+    const postingTimes = ensurePostingTimesFromConfig(config);
+
+    if (postingTimes.length === 0) {
+      console.log(`- Skipping concept '${config.name || folder.name}': posting times not defined.`);
       continue;
     }
 
-    // 4. Check if the schedule is due
-    try {
-      const options = { currentDate: executionTime };
-      const interval = parser.parseExpression(config.schedule, options);
-      const previousExecution = interval.previous().toDate();
-      
-      // Check if the scheduled time falls within the last hour
-      const oneHourAgo = new Date(executionTime.getTime() - 60 * 60 * 1000);
+    const oneHourAgo = new Date(executionTime.getTime() - 60 * 60 * 1000);
+    const dueTime = postingTimes.find(time => {
+      const lastOccurrence = getMostRecentOccurrence(time, executionTime);
+      return lastOccurrence >= oneHourAgo && lastOccurrence <= executionTime;
+    });
 
-      console.log(`- Checking concept '${config.name}': Schedule '${config.schedule}'. Last due: ${previousExecution.toISOString()}`);
+    console.log(`- Checking concept '${config.name || folder.name}': Times '${postingTimes.join(', ')}'.`);
 
-      if (previousExecution >= oneHourAgo) {
-        console.log(`  -> EXECUTING job for concept: ${config.name}`);
-        executedJobs.push({ 
-          name: config.name, 
-          schedule: config.schedule, 
-          executedAt: executionTime.toISOString() 
-        });
-
-        // Trigger post-video.ts script
-        const child = spawn('npx', ['ts-node', 'scripts/post-video.ts'], {
-          env: {
-            ...process.env, // Pass all current environment variables
-            CONCEPT_ID: folder.id!, // Pass the conceptId
-            GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON!, // Pass SA JSON
-          },
-          stdio: 'inherit', // Pipe child process output to parent's stdout/stderr
-        });
-
-        await new Promise((resolve, reject) => {
-          child.on('close', (code) => {
-            if (code === 0) {
-              console.log(`  -> Post-video script for ${config.name} completed successfully.`);
-              resolve(null);
-            } else {
-              console.error(`  -> Post-video script for ${config.name} failed with code ${code}.`);
-              reject(new Error(`Post-video script failed for ${config.name}`));
-            }
-          });
-          child.on('error', (err) => {
-            console.error(`  -> Failed to start post-video script for ${config.name}:`, err);
-            reject(err);
-          });
-        });
-      }
-    } catch (err: any) {
-      console.error(`  -> ERROR: Could not parse schedule for '${config.name}': ${err.message}`);
+    if (!dueTime) {
+      continue;
     }
+
+    console.log(`  -> EXECUTING job for concept: ${config.name || folder.name} at ${dueTime}`);
+    executedJobs.push({
+      name: config.name || folder.name,
+      time: dueTime,
+      executedAt: executionTime.toISOString(),
+    });
+
+    // Trigger post-video.ts script
+    const child = spawn('npx', ['ts-node', 'scripts/post-video.ts'], {
+      env: {
+        ...process.env,
+        CONCEPT_ID: folder.id!,
+        GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON!,
+      },
+      stdio: 'inherit',
+    });
+
+    await new Promise((resolve, reject) => {
+      child.on('close', (code) => {
+        if (code === 0) {
+          console.log(`  -> Post-video script for ${config.name || folder.name} completed successfully.`);
+          resolve(null);
+        } else {
+          console.error(`  -> Post-video script for ${config.name || folder.name} failed with code ${code}.`);
+          reject(new Error(`Post-video script failed for ${config.name || folder.name}`));
+        }
+      });
+      child.on('error', (err) => {
+        console.error(`  -> Failed to start post-video script for ${config.name || folder.name}:`, err);
+        reject(err);
+      });
+    });
   }
 
   console.log('\n--- Execution Summary ---');
@@ -139,6 +138,19 @@ async function getFileByName(drive: any, parentId: string, name: string): Promis
 async function getFileContent(drive: any, fileId: string): Promise<any> {
     const res = await drive.files.get({ fileId: fileId, alt: 'media' });
     return res.data;
+}
+
+function getMostRecentOccurrence(time: string, reference: Date): Date {
+  const [hourStr, minuteStr] = time.split(':');
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  const candidate = new Date(
+    Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate(), hour, minute)
+  );
+  if (candidate > reference) {
+    candidate.setUTCDate(candidate.getUTCDate() - 1);
+  }
+  return candidate;
 }
 
 // --- Run the script ---

@@ -40,6 +40,7 @@ function App() {
     const [isLoadingVideos, setIsLoadingVideos] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isPosting, setIsPosting] = useState<string | null>(null); // null or the videoId being posted
+    const [videoActionBusyId, setVideoActionBusyId] = useState<string | null>(null);
 
     const [isPostingModalOpen, setIsPostingModalOpen] = useState(false);
     const [videoToPost, setVideoToPost] = useState<VideoFile | null>(null);
@@ -215,9 +216,9 @@ function App() {
     const handleSaveConfig = async (newConfig: ConceptConfig) => {
         if (!selectedConcept || !accessToken) return;
         try {
-            await service.updateConceptConfig(accessToken!, selectedConcept.googleDriveFolderId, newConfig);
+            const updatedConfig = await service.updateConceptConfig(accessToken!, selectedConcept.googleDriveFolderId, newConfig);
             setConcepts(concepts.map(c => 
-                c.googleDriveFolderId === selectedConceptId ? { ...c, name: newConfig.name, config: newConfig } : c
+                c.googleDriveFolderId === selectedConceptId ? { ...c, name: updatedConfig.name, config: updatedConfig } : c
             ));
         } catch (err: any) {
             console.error("Failed to save config:", err);
@@ -230,8 +231,7 @@ function App() {
         if (!accessToken) return;
         try {
             await service.updateVideoPostDetails(accessToken!, videoId, postDetails);
-            // After updating, refresh videos to show the new override
-            fetchVideos();
+            await fetchVideos();
         } catch (err: any) {
             console.error("Failed to update video post details:", err);
             setError(`Failed to update video post details: ${err.message}`);
@@ -239,8 +239,53 @@ function App() {
         }
     };
 
+    const runVideoAction = async (videoId: string, action: () => Promise<void>, errorContext: string) => {
+        setVideoActionBusyId(videoId);
+        try {
+            await action();
+            await fetchVideos();
+        } catch (err: any) {
+            console.error(`${errorContext}:`, err);
+            const message = `${errorContext}: ${err.message || err}`;
+            setError(message);
+            alert(message);
+        } finally {
+            setVideoActionBusyId(null);
+        }
+    };
+
+    const handleMoveVideo = async (videoId: string, from: 'queue' | 'posted') => {
+        if (!selectedConcept || !accessToken) return;
+        const sourceFolderId = from === 'queue' ? selectedConcept.queueFolderId : selectedConcept.postedFolderId;
+        const targetFolderId = from === 'queue' ? selectedConcept.postedFolderId : selectedConcept.queueFolderId;
+        const destinationLabel = from === 'queue' ? 'posted' : 'queue';
+
+        await runVideoAction(
+            videoId,
+            () => service.moveVideo(accessToken!, videoId, sourceFolderId, targetFolderId),
+            `Failed to move video to the ${destinationLabel} folder`
+        );
+    };
+
+    const handleDeleteVideo = async (videoId: string, from: 'queue' | 'posted') => {
+        if (!selectedConcept || !accessToken) return;
+        const collection = from === 'queue' ? queuedVideos : postedVideos;
+        const video = collection.find(v => v.id === videoId);
+        if (!video) return;
+
+        if (!window.confirm(`Are you sure you want to delete "${video.name}"? This cannot be undone.`)) {
+            return;
+        }
+
+        await runVideoAction(
+            videoId,
+            () => service.deleteVideo(accessToken!, videoId),
+            `Failed to delete video "${video.name}"`
+        );
+    };
+
     const handleInitiatePost = (videoId: string) => {
-        const video = queuedVideos.find(v => v.id === videoId);
+        const video = queuedVideos.find(v => v.id === videoId) || postedVideos.find(v => v.id === videoId);
         if (video) {
             setVideoToPost(video);
             setIsPostingModalOpen(true);
@@ -345,6 +390,9 @@ function App() {
                                 postingVideoId={isPosting}
                                 conceptDefaultPostDetails={selectedConcept.config.postDetails || { title: '', description: '', hashtags: '', aiLabel: false }}
                                 onUpdateVideoPostDetails={handleUpdateVideoPostDetails}
+                                onMoveVideo={handleMoveVideo}
+                                onDeleteVideo={handleDeleteVideo}
+                                videoActionBusyId={videoActionBusyId}
                             />
                         </>
                     ) : (
@@ -395,22 +443,43 @@ function App() {
                             </div>
                         </div>
                         <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-2">
-                            {concepts.map(concept => (
-                                <div
-                                    key={concept.googleDriveFolderId}
-                                    onClick={() => handleSelectConcept(concept.googleDriveFolderId)}
-                                    className={`group flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors ${selectedConceptId === concept.googleDriveFolderId ? 'bg-indigo-900/50' : 'hover:bg-slate-800'}`}
-                                >
-                                    <span className="font-medium truncate">{concept.name}</span>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteConcept(concept); }}
-                                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity flex-shrink-0"
-                                        title="Delete Concept"
+                            {concepts.map(concept => {
+                                const youtubeName =
+                                    concept.config.apiKeys.youtube_channel_name?.trim() ||
+                                    concept.config.apiKeys.youtube_channel_id?.trim() ||
+                                    null;
+                                const tiktokTokens = concept.config.apiKeys.tiktok;
+                                const tiktokName =
+                                    tiktokTokens?.display_name ||
+                                    tiktokTokens?.username ||
+                                    tiktokTokens?.open_id ||
+                                    null;
+
+                                return (
+                                    <div
+                                        key={concept.googleDriveFolderId}
+                                        onClick={() => handleSelectConcept(concept.googleDriveFolderId)}
+                                        className={`group flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors ${selectedConceptId === concept.googleDriveFolderId ? 'bg-indigo-900/50' : 'hover:bg-slate-800'}`}
                                     >
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium truncate">{concept.name}</p>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                YouTube: {youtubeName || 'Not connected'}
+                                            </p>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                TikTok: {tiktokName || 'Not connected'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteConcept(concept); }}
+                                            className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity flex-shrink-0"
+                                            title="Delete Concept"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </aside>
                 )}

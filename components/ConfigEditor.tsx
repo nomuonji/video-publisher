@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ConceptConfig } from '../types';
+import { withNormalizedPostingTimes } from '../utils/schedule';
 import { Card } from './Card';
 import { ApiConfig } from './ApiConfig';
 import { PlatformSelector } from './PlatformSelector';
@@ -15,18 +16,18 @@ interface ConfigEditorProps {
 }
 
 export const ConfigEditor: React.FC<ConfigEditorProps> = ({ conceptId, conceptConfig, onSave, onRefresh, instagramAccounts, accessToken }) => {
-    const [config, setConfig] = useState<ConceptConfig>(conceptConfig);
+    const [config, setConfig] = useState<ConceptConfig>(withNormalizedPostingTimes(conceptConfig));
     const [isSaving, setIsSaving] = useState(false);
     
     // When the selected concept changes, reset the local state
     useEffect(() => {
-        setConfig(conceptConfig);
+        setConfig(withNormalizedPostingTimes(conceptConfig));
     }, [conceptConfig]);
 
     const handleSaveClick = async () => {
         setIsSaving(true);
         try {
-            await onSave(config);
+            await onSave(withNormalizedPostingTimes(config));
         } finally {
             setIsSaving(false);
         }

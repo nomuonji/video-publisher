@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { VideoFile, ConceptConfig } from '../types';
+import { DEFAULT_POST_DETAILS } from '../types';
 import { SpinnerIcon } from './icons/UtilityIcons';
 import { Card } from './Card';
 import { VideoPostDetailsEditor } from './VideoPostDetailsEditor';
@@ -12,30 +13,43 @@ interface VideoStatusProps {
   postingVideoId: string | null;
   conceptDefaultPostDetails: ConceptConfig['postDetails'];
   onUpdateVideoPostDetails: (videoId: string, postDetails: ConceptConfig['postDetails']) => Promise<void>;
+  onMoveVideo: (videoId: string, from: 'queue' | 'posted') => Promise<void>;
+  onDeleteVideo: (videoId: string, from: 'queue' | 'posted') => Promise<void>;
+  videoActionBusyId: string | null;
 }
 
 type Tab = 'Queued' | 'Posted';
 
 interface VideoListProps {
+    listType: 'queue' | 'posted';
     videos: VideoFile[];
-    showPostButton: boolean;
-    onPost?: (videoId: string) => void;
+    onPost: (videoId: string) => void;
     postingVideoId: string | null;
     onEditPostDetails: (video: VideoFile) => void;
+    onMoveVideo: (videoId: string) => void;
+    onDeleteVideo: (videoId: string) => void;
+    actionBusyId: string | null;
     conceptDefaultPostDetails: ConceptConfig['postDetails'];
 }
 
-const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, postingVideoId, onEditPostDetails, conceptDefaultPostDetails }) => {
+const VideoList: React.FC<VideoListProps> = ({ listType, videos, onPost, postingVideoId, onEditPostDetails, onMoveVideo, onDeleteVideo, actionBusyId, conceptDefaultPostDetails }) => {
     if (videos.length === 0) {
         return <p className="text-center text-slate-400 py-8">No videos in this list.</p>;
     }
+    const moveLabel = listType === 'queue' ? 'Move to Posted' : 'Move to Queue';
+    const postLabel = listType === 'queue' ? 'Post' : 'Post Again';
     return (
         <div className="space-y-3">
             {videos.map(video => {
                 const isCurrentlyPosting = postingVideoId === video.id;
-                // Ensure conceptDefaultPostDetails is always an object
-                const safeConceptDefaultPostDetails = conceptDefaultPostDetails || { title: '', description: '', hashtags: '', aiLabel: false };
-                const effectivePostDetails = video.postDetailsOverride || safeConceptDefaultPostDetails;
+                const isActionBusy = actionBusyId === video.id;
+                const basePostDetails = {
+                    ...DEFAULT_POST_DETAILS,
+                    ...(conceptDefaultPostDetails ?? {}),
+                };
+                const effectivePostDetails = video.postDetailsOverride
+                    ? { ...basePostDetails, ...video.postDetailsOverride }
+                    : basePostDetails;
 
                 return (
                     <div
@@ -68,20 +82,36 @@ const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, p
                             </div>
                         </a>
                         <button
+                            type="button"
                             onClick={() => onEditPostDetails(video)}
                             className="ml-2 px-3 py-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 rounded-md border border-indigo-400 hover:border-indigo-300 transition-colors"
                         >
                             Edit Details
                         </button>
-                        {showPostButton && onPost && (
-                            <button
-                                onClick={() => onPost(video.id)}
-                                className="ml-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm flex-shrink-0 w-24 flex justify-center items-center"
-                                disabled={isCurrentlyPosting || !!postingVideoId}
-                            >
-                                {isCurrentlyPosting ? <SpinnerIcon className="w-5 h-5" /> : 'Post'}
-                            </button>
-                        )}
+                        <button
+                            type="button"
+                            onClick={() => onPost(video.id)}
+                            className="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm flex-shrink-0 flex justify-center items-center"
+                            disabled={isCurrentlyPosting || isActionBusy || !!postingVideoId}
+                        >
+                            {isCurrentlyPosting ? <SpinnerIcon className="w-5 h-5" /> : postLabel}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onMoveVideo(video.id)}
+                            className="ml-2 bg-slate-600 hover:bg-slate-500 text-white font-medium py-2 px-4 rounded-lg text-sm flex-shrink-0 flex justify-center items-center"
+                            disabled={isCurrentlyPosting || isActionBusy}
+                        >
+                            {isActionBusy ? <SpinnerIcon className="w-5 h-5" /> : moveLabel}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onDeleteVideo(video.id)}
+                            className="ml-2 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-lg text-sm flex-shrink-0"
+                            disabled={isCurrentlyPosting || isActionBusy}
+                        >
+                            {isActionBusy ? <SpinnerIcon className="w-4 h-4" /> : 'Delete'}
+                        </button>
                     </div>
                 )
             })}
@@ -89,7 +119,18 @@ const VideoList: React.FC<VideoListProps> = ({ videos, showPostButton, onPost, p
     );
 };
 
-export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVideos, isLoading, onInitiatePost, postingVideoId, conceptDefaultPostDetails, onUpdateVideoPostDetails }) => {
+export const VideoStatus: React.FC<VideoStatusProps> = ({
+  queuedVideos,
+  postedVideos,
+  isLoading,
+  onInitiatePost,
+  postingVideoId,
+  conceptDefaultPostDetails,
+  onUpdateVideoPostDetails,
+  onMoveVideo,
+  onDeleteVideo,
+  videoActionBusyId,
+}) => {
   const [activeTab, setActiveTab] = useState<Tab>('Queued');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [videoToEdit, setVideoToEdit] = useState<VideoFile | null>(null);
@@ -147,20 +188,27 @@ export const VideoStatus: React.FC<VideoStatusProps> = ({ queuedVideos, postedVi
             <>
               {activeTab === 'Queued' && (
                 <VideoList
+                  listType="queue"
                   videos={queuedVideos}
-                  showPostButton={true}
                   onPost={onInitiatePost}
                   postingVideoId={postingVideoId}
                   onEditPostDetails={handleEditPostDetails}
+                  onMoveVideo={(videoId) => { void onMoveVideo(videoId, 'queue'); }}
+                  onDeleteVideo={(videoId) => { void onDeleteVideo(videoId, 'queue'); }}
+                  actionBusyId={videoActionBusyId}
                   conceptDefaultPostDetails={conceptDefaultPostDetails}
                 />
               )}
               {activeTab === 'Posted' && (
                 <VideoList
+                  listType="posted"
                   videos={postedVideos}
-                  showPostButton={false}
-                  postingVideoId={null}
+                  onPost={onInitiatePost}
+                  postingVideoId={postingVideoId}
                   onEditPostDetails={handleEditPostDetails}
+                  onMoveVideo={(videoId) => { void onMoveVideo(videoId, 'posted'); }}
+                  onDeleteVideo={(videoId) => { void onDeleteVideo(videoId, 'posted'); }}
+                  actionBusyId={videoActionBusyId}
                   conceptDefaultPostDetails={conceptDefaultPostDetails}
                 />
               )}
