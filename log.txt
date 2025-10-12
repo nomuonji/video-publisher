@@ -1,68 +1,578 @@
- Ready! Available at httplocalhost3000
-[performVideoPosting] Starting for concept 1m0pxP-NJu9glAFoQFmHdBbWLxKQTe1mX
+> Ready! Available at http://localhost:3000
+[performVideoPosting] Starting for concept: 1m0pxP-NJu9glAFoQFmHdBbWLxKQTe1mX
 [performVideoPosting] Loaded config for ちんすけ
 [performVideoPosting] Loaded 5 Instagram accounts.
-[performVideoPosting] Selected video to post rendered_clip_002_140-227.mp4 (ID 1r0yjMBwyB5UkmNrxhOUujwPuijJQqE0B) from posted folder.
-[performVideoPosting] Generated Title あなたの彼女
-[performVideoPosting] Generated Description
+[performVideoPosting] Selected video to post: rendered_clip_002_140-227.mp4 (ID: 1r0yjMBwyB5UkmNrxhOUujwPuijJQqE0B) from posted folder.
+[performVideoPosting] Generated Title: あなたの彼女
+[performVideoPosting] Generated Description:
 
 This video includes altered or synthetic content.
-[performVideoPosting] Generated Hashtags #美女 #sora
-[performVideoPosting] AI Label true
+[performVideoPosting] Generated Hashtags: #美女 #sora
+[performVideoPosting] AI Label: true
 [performVideoPosting] Posting to Instagram...
 [instagram] === Start posting sequence ===
-[instagram] POST httpsgraph.facebook.comv19.017841476768803816media
-[instagram] Request params access_token=ACCESS_TOKEN&media_type=REELS&upload_phase=start&caption=あなたの彼女
-
-
-This video includes altered or synthetic content.
-#美女 #sora&is_ai_generated=true
-[instagram] Equivalent curl
-curl -X POST httpsgraph.facebook.comv19.017841476768803816media 
-  -F access_token=ACCESS_TOKEN 
-  -F media_type=REELS 
-  -F upload_phase=start 
-  -F caption=CAPTION 
-  -F is_ai_generated=true
-[instagram] Response status 400
-[instagram] Response body {
-  error {
-    message '(#100) The parameter video_url is required',
-    type 'OAuthException',
-    code 100,
-    fbtrace_id 'A34fvKx3sbAPtSkJcgdnQ-F'
+[instagram] Source video identifier: 1r0yjMBwyB5UkmNrxhOUujwPuijJQqE0B
+[instagram] POST https://graph-video.facebook.com/v19.0/17841476768803816/media
+[instagram] Request params: access_token=EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm&media_type=REELS&upload_phase=start&upload_type=resumable&file_size=33699674
+[instagram] Response status: 200
+[instagram] Response body: {
+  id: '17852585877558961',
+  uri: 'https://rupload.facebook.com/ig-api-upload/v24.0/17852585877558961'
+}
+[instagram] Upload session id: 17852585877558961
+[instagram] Upload url: https://rupload.facebook.com/ig-api-upload/v24.0/17852585877558961
+[instagram] Upload chunk 0-4194303 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '0',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 0-4194303/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"0","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '0'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:44 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=15, rtx=0, c=10, mss=1392, tbw=3461, tp=-1, tpl=-1, uplat=906, ullat=53'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
   }
 }
-[performVideoPosting] Failed to post to Instagram Error Instagram session creation failed (#100) The parameter video_url is required
-    at postVideoToInstagram (fileDyouphProjectvideo-publisherservicesinstagramService.ts8115)
-    at processTicksAndRejections (nodeinternalprocesstask_queues955)
-    at async performVideoPosting (fileDyouphProjectvideo-publisherapi_libpostVideo.ts30735)
-    at async handler (fileDyouphProjectvideo-publisherapipostindex.ts1425)
+[instagram] Upload chunk 4194304-8388607 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '4194304',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 4194304-8388607/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"1","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '4194304'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:45 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=22, rtx=0, c=10, mss=1392, tbw=3900, tp=-1, tpl=-1, uplat=414, ullat=131'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 8388608-12582911 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '8388608',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 8388608-12582911/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"2","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '8388608'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:46 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=26, rtx=0, c=10, mss=1392, tbw=4340, tp=-1, tpl=-1, uplat=401, ullat=197'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 12582912-16777215 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '12582912',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 12582912-16777215/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"3","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '12582912'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:47 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=31, rtx=0, c=10, mss=1392, tbw=4780, tp=-1, tpl=-1, uplat=464, ullat=271'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 16777216-20971519 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '16777216',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 16777216-20971519/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"4","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '16777216'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:48 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=36, rtx=0, c=10, mss=1392, tbw=5220, tp=-1, tpl=-1, uplat=540, ullat=359'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 20971520-25165823 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '20971520',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 20971520-25165823/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"5","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '20971520'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:49 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=40, rtx=0, c=10, mss=1392, tbw=5660, tp=-1, tpl=-1, uplat=620, ullat=440'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 25165824-29360127 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '25165824',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 25165824-29360127/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"6","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '25165824'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:51 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=42, rtx=0, c=10, mss=1392, tbw=6100, tp=-1, tpl=-1, uplat=706, ullat=527'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 29360128-33554431 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '29360128',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 29360128-33554431/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"7","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '29360128'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:41:52 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=44, rtx=0, c=10, mss=1392, tbw=6540, tp=-1, tpl=-1, uplat=631, ullat=453'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 33554432-33699673 (145242 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '33554432',
+  'Content-Length': '145242',
+  'Content-Range': 'bytes 33554432-33699673/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"1","chunk_sequence_number":"8","chunk_length":"145242"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '33554432'
+}
+[instagram] Chunk response status: 400
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '103',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:24 GMT',
+  'proxy-status': 'http_request_error; e_fb_vipaddr="AcM35uwKL6BJxGOhKfpubEY2eCZAkm39uciAIS-oBfbjZAdMYPSUXyYuRk3E5WogoZPkC8fcENFKB49ILAZT8uV5zcqHKf7VW7fTON8"; e_clientaddr="AcPOmIYxSJuqQleTFuka2qu-SY0kRJJ0e5veK5YHU66dWAeM14yorj5AeffgdpJ6dILrQtq2ljUXDrx5nx2lDmc9t_oo9IcBO7U4_wMUoL90H67EUg"; e_upip="AcOrjaLtF9-IgjixumQ9tGYbNVzCb137SlvlOJABbfxmZAKOGBvDISU62jcCZKGTp12CPIRhKWAYjE2k7lzmpaS-0E0_ZvLFqNm1J2U"; e_fb_zone="AcPzndTF6A1fy9FHijuGDxk7wTJIo47cv-W7v60W2QKRVX7xeXyjCQAj_R9qP1xQ"; e_fb_twtaskhandle="AcO3a1lz8abDMbBo-wrQt2nTvYSurm8UFyDR07A20QB-hReXV-8funfzcac4vC-Ki8HK2zKC79rLB_9xMIWfohHc41c4yCqo1TzK01gy"; e_proxy="AcMxnhShYz-J6CLZktVEa2_1yp3fH6OopOOPSCMXr8aOBeRqHMoGGG6vzwLE0c_hhZyYID1YhUnyV6Vz94WT", http_request_error; e_fb_vipaddr="AcNO1VrR5r2KoMB2uk3rgsRuuvoVKZoTagh966gC19mpQSyx4-mI-_6tQfrK_N7EuKx3zpuYHTGWyjAzT11hpJd3o7Dw3wG3pw"; e_clientaddr="AcNB03qNXu5Gw-0gGBO4MsoTjS6T_hVpdv9gQgAlXUGFjYuaUvu3UzCAHgu0DP6iWbwP74XU7HaZnN96Al8Pq9tvZo7eE7hXvyLYWZqppryZuVIrJe6ZxA"; e_upip="AcOiNGDnZj2_rNCuURYhKajjKZudLdfCatSWP9eF8vdC1ffGibfVbcxjQF9Hw-PtR_TgnW00DvA4j_cqbJpvllGwVjh7gEncl2UqsFM"; e_fb_zone="AcMfGUOHiXg_PO7NH5IJEtd1C--7r6p0gxDkfKE34ubkOyjJxpL9Qd_XFwQa-w"; e_fb_twtaskhandle="AcMCP9YMuYLvVfP4gfEBQ7vsUf5zSFUVtJbeBzvGQZHWzr732D9fQSOaU5u6nAzLWYw_D-oSWXExvykfBGG_DyeZ2j9ilffLfUk"; e_proxy="AcOaqqfE9WI5NFuAa24JWYahlUx_gYaBY9hyU3ShHav-Gcb-g5WBPmQ8YptJPWbStyNxOy4jml8NDUE"',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=47, rtx=0, c=10, mss=1392, tbw=6980, tp=-1, tpl=-1, uplat=31451, ullat=15'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: false,
+    type: 'ProcessingFailedError',
+    message: 'Request processing failed'
+  }
+}
+[instagram] Chunk upload failed (Request processing failed). Retrying attempt 1 after 6000 ms
+[instagram] Chunk response status: 412
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '163',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:30 GMT',
+  'proxy-status': 'http_request_error; e_fb_vipaddr="AcNJKyDvfzK-eB3S9Ii6HfE3n7YwgwpJzVe3EvXQ5i35UHF-IBD8hv8tGnwRs0-pUkNuS5Gm5yAuBJL0VvHsPecwTJql-EIP1nU8hYY"; e_clientaddr="AcPfXBJ3G9pRRRNSg6kou5I5ZrRSjFdD3odfc1AP8Pf2dedjl0xKgv165YiKSPa6IFi8fS1C_MXFOFaRqk3LWGe-yJRdB28DMMdar0mt66bnY3zKOA"; e_upip="AcMhV0b2Wnwn000tRMbCRcZxAN6nF8f6SwaL2zsr7GSPPvBNVW5R_rhF6IBuGyu7XUcSmrC4QS059-jgiu-eiHryfbMdEgtV0vH1Z2M"; e_fb_zone="AcP46C0oBxXzZtswWUWxnJAVHTfc8PZa2KDgTOHDFIFLc-5TYcmwA4RH56ZXl4ML"; e_fb_twtaskhandle="AcORWYAobIYxJRGRHA6Q0d_wvT7TTjVZckdYIUpL26wiMWknH9bqtpdsRfbuB2K_oj3n0nxpq1BunNhRgQoa27TuOz1QJc4LIN9RaPtC"; e_proxy="AcMyCevB1BZQcsoubK1yNV9OOmAhpMh4ngl0So_8FPg1BPMVMB55pSDIAlDR0e4BImcbDFYf3OPMVsD5HIMT", http_request_error; e_fb_vipaddr="AcPPlF9BMUp3Fk6mPWWnYjfPjCvV8nuMgbaNmu-zixROuhsS4r1EIdlOvURMNdmT2NxcskFy74yoWd_3fFNGGieo_FMHSq4j0w"; e_clientaddr="AcMXA3g0O8exUFHKIMBRCVL82Gmzk01m33OUPSTiN76_sMEqa2UGG0pNZA8BiLqZqT5z56VFlzLTot4U8aBvQ6IMfqaRUN1tZK5V2O9HdIS5av2auRbsOQ"; e_upip="AcPDrV_-W7eyFXrryyE6mLYWBV7goQKqz-V815jDjsejWBdCnrXm93aPsjX-iG9v5dh1S0JXbtP3Hxn6xLhLgvdll9AL5sR3tvYs1eQ"; e_fb_zone="AcMCc6lZpem2oyFXmV2Nh3EjgK_h8ijj_L_WRIMyAUWHdV9gxaTKKUUvS4iS3Q"; e_fb_twtaskhandle="AcNBX1Lm7IKe7kyvPrGJKoTBlHfF34HjpmWe0_uTtHnTKrCL4FZ043srKKSqAZv7jXQpw-bHEvVIaHU7j7D81F220Wssryvf6t8r"; e_proxy="AcNutkJ_SPlnRLhyXYI14JuxbGQFPhCJHVfhg1DZ8Abo8fNRtKEbTQKxyI_wR15V8zBZ9mIFSDIeLIc"',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=18, rtx=0, c=10, mss=1392, tbw=380, tp=-1, tpl=-1, uplat=367, ullat=0'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'OffsetInvalidError',
+    message: 'Request starting offset is invalid. Maximum accepted offset: 0, offset received: 33554432'
+  }
+}
+[instagram] Offset mismatch detected. Server expects 0 but client had 33554432. Resyncing chunk position.
+[instagram] Upload chunk 0-4194303 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '0',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 0-4194303/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"0","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '0'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:37 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=19, rtx=0, c=10, mss=1392, tbw=380, tp=-1, tpl=-1, uplat=908, ullat=51'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 4194304-8388607 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '4194304',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 4194304-8388607/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"1","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '4194304'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:38 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=25, rtx=0, c=10, mss=1392, tbw=818, tp=-1, tpl=-1, uplat=661, ullat=492'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 8388608-12582911 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '8388608',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 8388608-12582911/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"2","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '8388608'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:40 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=30, rtx=0, c=10, mss=1392, tbw=1257, tp=-1, tpl=-1, uplat=597, ullat=421'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 12582912-16777215 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '12582912',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 12582912-16777215/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"3","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '12582912'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:41 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=34, rtx=0, c=10, mss=1392, tbw=1697, tp=-1, tpl=-1, uplat=548, ullat=367'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 16777216-20971519 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '16777216',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 16777216-20971519/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"4","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '16777216'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:42 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=38, rtx=0, c=10, mss=1392, tbw=2137, tp=-1, tpl=-1, uplat=541, ullat=360'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 20971520-25165823 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '20971520',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 20971520-25165823/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"5","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '20971520'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:43 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=41, rtx=0, c=10, mss=1392, tbw=2577, tp=-1, tpl=-1, uplat=656, ullat=478'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 25165824-29360127 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '25165824',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 25165824-29360127/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"6","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '25165824'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:44 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=43, rtx=0, c=10, mss=1392, tbw=3017, tp=-1, tpl=-1, uplat=603, ullat=425'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 29360128-33554431 (4194304 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '29360128',
+  'Content-Length': '4194304',
+  'Content-Range': 'bytes 29360128-33554431/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"0","chunk_sequence_number":"7","chunk_length":"4194304"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '29360128'
+}
+[instagram] Chunk response status: 206
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '121',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:45 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=46, rtx=0, c=10, mss=1392, tbw=3457, tp=-1, tpl=-1, uplat=558, ullat=381'
+}
+[instagram] Chunk response body: {
+  debug_info: {
+    retriable: true,
+    type: 'PartialRequestError',
+    message: 'Partial request (did not match length of file)'
+  }
+}
+[instagram] Upload chunk 33554432-33699673 (145242 bytes)
+[instagram] Chunk headers: {
+  Authorization: 'OAuth EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm',
+  'Content-Type': 'application/octet-stream',
+  Offset: '33554432',
+  'Content-Length': '145242',
+  'Content-Range': 'bytes 33554432-33699673/33699674',
+  'X-Instagram-Rupload-Params': '{"upload_id":"17852585877558961","media_type":"2","name":"rendered_clip_002_140-227.mp4","chunk_retry_interval":6000,"xsharing_user_ids":"[\\"17841476768803816\\"]","upload_file_size":"33699674","upload_media_spec":"{\\"media_type\\":2,\\"original_width\\":1080,\\"original_height\\":1920,\\"aspect_ratio\\":1.778}","retry_context":"{\\"num_step_auto_retry\\":0,\\"num_reupload\\":0,\\"num_step_manual_retry\\":0}","is_last":"1","chunk_sequence_number":"8","chunk_length":"145242"}',
+  'X-Entity-Name': 'rendered_clip_002_140-227.mp4',
+  'X-Entity-Type': 'video/mp4',
+  'X-Entity-Length': '33699674',
+  'X-Entity-Offset': '33554432'
+}
+[instagram] Chunk response status: 200
+[instagram] Chunk response headers: {
+  'alt-svc': 'h3=":443"; ma=86400',
+  connection: 'keep-alive',
+  'content-length': '47',
+  'content-type': 'application/json',
+  date: 'Sun, 12 Oct 2025 19:42:47 GMT',
+  'x-fb-connection-quality': 'EXCELLENT; q=0.9, rtt=48, rtx=0, c=10, mss=1392, tbw=3897, tp=-1, tpl=-1, uplat=1164, ullat=8'
+}
+[instagram] Chunk response body: { success: true, message: 'Upload Successful.' }
+[instagram] Finishing upload session...
+[instagram] Finish params: media_type=REELS&video_type=REELS&clips_subtype=REELS&access_token=EAAQO8CYUoN0BPvIDc0q3Bi2VCqWNLrHgmWu82QnHEDlrFrhX7FZAXPbVzvahlGzQ9sx0a5G86VJBZB1cm95bpkOMKCYlb14uUBTwhyPTFpbhUZBvYkIr3CqPxnysK8ZAwZAYxoasTNzrblzTYLInM8jRTMLsh8zlyZBSSTLZBcWfaor4ZBRN78spZA8svOWqCspwdRZBgm&upload_phase=finish&upload_session_id=17852585877558961&caption=%E3%81%82%E3%81%AA%E3%81%9F%E3%81%AE%E5%BD%BC%E5%A5%B3%0A%0A%0AThis+video+includes+altered+or+synthetic+content.%0A%23%E7%BE%8E%E5%A5%B3+%23sora&video_id=17852585877558961&video_url=https%3A%2F%2Frupload.facebook.com%2Fig-api-upload%2Fv24.0%2F17852585877558961&is_ai_generated=true&thumb_offset=0&cover_url=https%3A%2F%2Flh3.googleusercontent.com%2Fdrive-storage%2FAJQWtBNt5j7t2FmhENLLFZubR0cJd5TAfVwDsBGtYtY1s4cNs6F_QbFZEEApSGBtlh-iRsLbtSSubwbqJU7pvvO3-8Yu3ataTtQGbfMqzMdwKpuAay5U%3Ds220
+[instagram] Finish response status: 200
+[instagram] Finish response body: { id: '17852585937558961' }
+[instagram] Polling processing status...
+[instagram] Status response: 200
+[instagram] Status body: {
+  status: 'Finished: Media has been uploaded and it is ready to be published.',
+  status_code: 'FINISHED',
+  id: '17852585877558961'
+}
+[instagram] Upload session finished with status: FINISHED
+[instagram] Creation id for publish: 17852585877558961
+[instagram] Publishing media container...
+[instagram] Publish response status: 200
+[instagram] Publish response body: { id: '17915726250068283' }
+[instagram] === Posting sequence finished ===
+[performVideoPosting] Video posted to Instagram: あなたの彼女 { id: '17915726250068283' }
 [performVideoPosting] Video rendered_clip_002_140-227.mp4 is already in 'posted' folder; skipping move.
-api_libpostVideo.ts7863 - error TS18046 'newTokens' is of type 'unknown'.
-
-78     throw new Error(`Failed to refresh TikTok access token ${newTokens.error_description  'Unknown error'}`);
-                                                                 ~~~~~~~~~
-
-api_libpostVideo.ts29655 - error TS18046 'uploadInitData' is of type 'unknown'.
-
-296         throw new Error(`TikTok upload init failed ${uploadInitData.error.message  'Unknown error'}`);
-                                                          ~~~~~~~~~~~~~~
-
-api_libpostVideo.ts29925 - error TS18046 'uploadInitData' is of type 'unknown'.
-
-299       const uploadUrl = uploadInitData.data.upload_url;
-                            ~~~~~~~~~~~~~~
-
-api_libpostVideo.ts30025 - error TS18046 'uploadInitData' is of type 'unknown'.
-
-300       const publishId = uploadInitData.data.publish_id;
-                            ~~~~~~~~~~~~~~
-
-api_libpostVideo.ts32757 - error TS18046 'publishData' is of type 'unknown'.
-
-327         throw new Error(`TikTok video publish failed ${publishData.error.message  'Unknown error'}`);
-                                                            ~~~~~~~~~~~
-
-
-Found 5 errors in the same file, starting at api_libpostVideo.ts78

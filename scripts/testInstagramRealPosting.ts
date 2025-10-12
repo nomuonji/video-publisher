@@ -53,8 +53,8 @@ async function downloadFromGoogleDrive(fileId: string): Promise<{ buffer: Buffer
       scopes: ['https://www.googleapis.com/auth/drive.readonly'],
     });
     const client = await auth.getClient();
-    const drive = google.drive({ version: 'v3', auth: client });
-    const meta = await drive.files.get({ fileId, fields: 'name,thumbnailLink,videoMediaMetadata' });
+    const drive = google.drive({ version: 'v3', auth: client as any });
+    const metaResponse = await drive.files.get({ fileId, fields: 'name,thumbnailLink,videoMediaMetadata' } as any);
     const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
@@ -62,13 +62,16 @@ async function downloadFromGoogleDrive(fileId: string): Promise<{ buffer: Buffer
       response.data.on('end', resolve);
       response.data.on('error', reject);
     });
+    const meta = metaResponse.data as any;
     return {
       buffer: Buffer.concat(chunks),
-      name: meta.data.name ?? undefined,
-      thumbnailLink: meta.data.thumbnailLink ?? undefined,
-      width: meta.data.videoMediaMetadata?.width ?? undefined,
-      height: meta.data.videoMediaMetadata?.height ?? undefined,
-      durationMs: meta.data.videoMediaMetadata?.durationMillis ?? undefined,
+      name: typeof meta?.name === 'string' ? meta.name : undefined,
+      thumbnailLink: typeof meta?.thumbnailLink === 'string' ? meta.thumbnailLink : undefined,
+      width: typeof meta?.videoMediaMetadata?.width === 'number' ? meta.videoMediaMetadata.width : undefined,
+      height: typeof meta?.videoMediaMetadata?.height === 'number' ? meta.videoMediaMetadata.height : undefined,
+      durationMs: typeof meta?.videoMediaMetadata?.durationMillis === 'number'
+        ? meta.videoMediaMetadata.durationMillis
+        : undefined,
     };
   }
 

@@ -4,6 +4,7 @@ import { JWT } from 'google-auth-library';
 import fetch from 'node-fetch';
 import type { ConceptConfig, TikTokTokens, PostResult } from '../../types.js';
 import { withNormalizedPostingTimes } from '../../utils/schedule.js';
+import { postVideoToInstagram } from '../../services/instagramService.js';
 
 // --- Authentication ---
 function getAuth(serviceAccountJson: string) {
@@ -348,73 +349,35 @@ export async function performVideoPosting({
       const instagramPageAccessToken = targetInstagramAccount.page_access_token;
       const instagramUserId = targetInstagramAccount.id;
 
-      // Step 1: Start Resumable Upload Session
-      const sessionEndpoint = `https://graph.facebook.com/v19.0/${instagramUserId}/media`;
-      const sessionResponse = await fetch(sessionEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${instagramPageAccessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          media_type: 'VIDEO',
-          upload_type: 'resumable',
-          caption: `${title}\n${description}\n${hashtags}`,
-          is_ai_generated: aiLabel,
-        }),
-      });
-      const sessionData = await sessionResponse.json();
-      if (!sessionResponse.ok) {
-        throw new Error(`Instagram session creation failed: ${sessionData.error?.message || 'Unknown error'}`);
-      }
-      const mediaContainerId = sessionData.id;
-      let uploadUrl = sessionData.upload_url; // As per research, this should be returned
-
-      if (!uploadUrl) {
-        // Fallback based on other documentation, in case upload_url is not present
-        // This part is for robustness, as API responses can vary.
-        console.warn('Instagram session did not return a direct upload_url. Attempting upload to container ID endpoint as a fallback.');
-        uploadUrl = `https://graph.facebook.com/v19.0/${mediaContainerId}`;
-        // Note: The Authorization header for this might need to be 'OAuth' instead of 'Bearer'
-      }
-
-      // Step 2: Download video from Google Drive
-      const videoFileResponse = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'arraybuffer' });
+      const fields = 'name,thumbnailLink,videoMediaMetadata';
+      const [videoFileResponse, videoMetaResponse] = await Promise.all([
+        drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'arraybuffer' }),
+        drive.files.get({ fileId: videoToPost.id, fields }),
+      ]);
       const videoBuffer = Buffer.from(videoFileResponse.data as ArrayBuffer);
-
-      // Step 3: Upload video file to the upload URL
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `OAuth ${instagramPageAccessToken}`,
-          'Content-Type': 'application/octet-stream',
-          'Content-Length': String(videoBuffer.length),
-        },
-        body: videoBuffer,
-      });
-      const uploadData = await uploadResponse.json();
-      if (!uploadResponse.ok) {
-        throw new Error(`Instagram video content upload failed: ${uploadData.error?.message || 'Unknown error'}`);
+      if (!videoBuffer.length) {
+        throw new Error('Downloaded video buffer is empty. Check Google Drive file accessibility.');
       }
+      const meta = videoMetaResponse.data as { name?: string; thumbnailLink?: string; videoMediaMetadata?: { width?: number; height?: number; durationMillis?: number; } };
+      const caption = `${title}\n${description}\n${hashtags}`;
 
-      // Step 4: Publish the media container
-      const publishEndpoint = `https://graph.facebook.com/v19.0/${instagramUserId}/media_publish`;
-      const publishResponse = await fetch(publishEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${instagramPageAccessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          creation_id: mediaContainerId,
-        }),
+      const publishResult = await postVideoToInstagram({
+        accessToken: instagramPageAccessToken,
+        instagramAccountId: instagramUserId,
+        videoBuffer,
+        caption,
+        isAiGenerated: aiLabel ?? undefined,
+        videoName: meta.name ?? videoToPost.name,
+        videoId: videoToPost.id,
+        coverUrl: meta.thumbnailLink ?? undefined,
+        videoWidth: meta.videoMediaMetadata?.width ?? undefined,
+        videoHeight: meta.videoMediaMetadata?.height ?? undefined,
+        videoDurationSeconds: typeof meta.videoMediaMetadata?.durationMillis === 'number'
+          ? meta.videoMediaMetadata.durationMillis / 1000
+          : undefined,
       });
-      const publishData = await publishResponse.json();
-      if (!publishResponse.ok) {
-        throw new Error(`Instagram media publish failed: ${publishData.error?.message || 'Unknown error'}`);
-      }
 
-      console.log(`[performVideoPosting] Video posted to Instagram: ${title}`);
+      console.log(`[performVideoPosting] Video posted to Instagram: ${title}`, publishResult);
       results.Instagram = { success: true, message: `Successfully posted to Instagram: ${title}` };
     } catch (error: any) {
       console.error(`[performVideoPosting] Failed to post to Instagram:`, error);

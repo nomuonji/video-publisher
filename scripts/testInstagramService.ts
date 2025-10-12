@@ -22,7 +22,7 @@ async function runInstagramFlowTest(): Promise<void> {
     { status_code: "FINISHED" },
   ];
 
-  const fetchMock = async (input: string, init?: RequestInit): Promise<Response> => {
+  const fetchMock: (input: RequestInfo, init?: RequestInit) => Promise<Response> = async (input, init) => {
     const method = init?.method ?? "GET";
     const headers: Record<string, string> = {};
     if (init?.headers) {
@@ -31,6 +31,13 @@ async function runInstagramFlowTest(): Promise<void> {
       }
     }
 
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+        ? input.toString()
+        : (input as Request).url;
+
     let bodyText: string | undefined;
     if (init?.body instanceof URLSearchParams) {
       bodyText = init.body.toString();
@@ -38,9 +45,9 @@ async function runInstagramFlowTest(): Promise<void> {
       bodyText = init.body;
     }
 
-    recorded.push({ url: input, method, body: bodyText, headers });
+    recorded.push({ url, method, body: bodyText, headers });
 
-    if (method === "POST" && input.endsWith(`/${instagramAccountId}/media`)) {
+    if (method === "POST" && url.endsWith(`/${instagramAccountId}/media`)) {
       if (bodyText?.includes("upload_phase=start")) {
         if (!bodyText.includes("file_size=")) {
           throw new Error("start call missing file_size parameter");
@@ -79,7 +86,7 @@ async function runInstagramFlowTest(): Promise<void> {
       throw new Error("Unexpected upload_phase value");
     }
 
-    if (method === "POST" && input === uploadUrl) {
+    if (method === "POST" && url === uploadUrl) {
       const ruploadRaw = headers["x-instagram-rupload-params"];
       if (!ruploadRaw) {
         throw new Error("upload call missing X-Instagram-Rupload-Params header");
@@ -107,12 +114,12 @@ async function runInstagramFlowTest(): Promise<void> {
       return new Response(JSON.stringify({ success: true }), { status: 200 });
     }
 
-    if (method === "GET" && input.startsWith(`https://graph-video.facebook.com/v19.0/${uploadSessionId}`)) {
+    if (method === "GET" && url.startsWith(`https://graph-video.facebook.com/v19.0/${uploadSessionId}`)) {
       const next = pollResponses.shift();
       return new Response(JSON.stringify(next ?? { status_code: "FINISHED" }), { status: 200 });
     }
 
-    if (method === "POST" && input.endsWith(`/${instagramAccountId}/media_publish`)) {
+    if (method === "POST" && url.endsWith(`/${instagramAccountId}/media_publish`)) {
       if (!bodyText?.includes(`creation_id=${creationId}`)) {
         throw new Error("publish call missing creation_id");
       }
@@ -145,7 +152,7 @@ async function runInstagramFlowTest(): Promise<void> {
       videoDurationSeconds: 12,
     },
     {
-      fetchImpl: fetchMock,
+      fetchImpl: fetchMock as any,
       logger,
       delayFn: async () => undefined,
     },

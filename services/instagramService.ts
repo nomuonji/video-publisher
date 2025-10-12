@@ -84,6 +84,9 @@ export async function postVideoToInstagram(
   const delayFn = options.delayFn ?? delay;
 
   logger.log("[instagram] === Start posting sequence ===");
+  if (videoId) {
+    logger.log("[instagram] Source video identifier: %s", videoId);
+  }
 
   const startEndpoint = `${GRAPH_VIDEO_API_URL}/${instagramAccountId}/media`;
   const startParams = new URLSearchParams();
@@ -155,7 +158,7 @@ export async function postVideoToInstagram(
   let offset = 0;
   let chunkIndex = 0;
 
-  while (offset < totalSize) {
+outer: while (offset < totalSize) {
     const end = Math.min(offset + chunkSize, totalSize);
     const chunk = videoBuffer.subarray(offset, end);
     const chunkParams = {
@@ -206,29 +209,73 @@ export async function postVideoToInstagram(
       logger.log("[instagram] Chunk response body:", uploadData);
 
       if (uploadResponse.ok) {
+        offset = end;
+        chunkIndex += 1;
         break;
       }
 
-      const retryable =
+      const debugInfo = typeof uploadData === "object" ? uploadData?.debug_info ?? {} : {};
+      const errorMessage =
+        typeof debugInfo?.message === "string"
+          ? debugInfo.message
+          : uploadBodyText || "Unknown error";
+      const errorType = typeof debugInfo?.type === "string" ? debugInfo.type : undefined;
+      let suggestedOffset: number | undefined;
+      if (
         typeof uploadData === "object" &&
-        uploadData?.debug_info?.retriable !== false &&
-        attempt < 2;
+        uploadData !== null &&
+        typeof (uploadData as any).offset === "number"
+      ) {
+        suggestedOffset = Math.max(0, (uploadData as any).offset);
+      } else if (
+        typeof uploadData === "object" &&
+        uploadData !== null &&
+        typeof (uploadData as any).start_offset === "number"
+      ) {
+        suggestedOffset = Math.max(0, (uploadData as any).start_offset);
+      } else if (typeof errorMessage === "string") {
+        const match = errorMessage.match(/Maximum accepted offset:\s*(\d+)/i);
+        if (match) {
+          suggestedOffset = Number(match[1]);
+        }
+      }
 
-      if (retryable) {
-        logger.warn?.("[instagram] Retrying chunk upload due to API response");
-        attempt += 1;
+      const explicitlyRetryable = debugInfo?.retriable === true;
+      const implicitlyRetryable =
+        uploadResponse.status >= 500 ||
+        (errorType && ["PartialRequestError", "ProcessingFailedError", "TranscodeError"].includes(errorType));
+      const offsetMismatch =
+        errorType === "OffsetInvalidError" ||
+        (typeof errorMessage === "string" && /offset/i.test(errorMessage));
+
+      if (offsetMismatch && typeof suggestedOffset === "number" && suggestedOffset !== offset) {
+        logger.warn?.(
+          "[instagram] Offset mismatch detected. Server expects %d but client had %d. Resyncing chunk position.",
+          suggestedOffset,
+          offset,
+        );
+        offset = suggestedOffset;
+        chunkIndex = Math.floor(suggestedOffset / chunkSize);
+        attempt = 0;
         await delayFn(DEFAULT_RETRY_INTERVAL_MS);
+        continue outer;
+      }
+
+      if (attempt < 4 && (explicitlyRetryable || implicitlyRetryable)) {
+        attempt += 1;
+        const backoff = DEFAULT_RETRY_INTERVAL_MS * attempt;
+        logger.warn?.(
+          "[instagram] Chunk upload failed (%s). Retrying attempt %d after %d ms",
+          errorMessage,
+          attempt,
+          backoff,
+        );
+        await delayFn(backoff);
         continue;
       }
 
-      const message = typeof uploadData === "object" && uploadData?.debug_info?.message
-        ? uploadData.debug_info.message
-        : uploadBodyText || "Unknown error";
-      throw new Error(`Instagram video upload failed: ${message}`);
+      throw new Error(`Instagram video upload failed: ${errorMessage}`);
     }
-
-    offset = end;
-    chunkIndex += 1;
 
     if (offset < totalSize) {
       await delayFn(500);
