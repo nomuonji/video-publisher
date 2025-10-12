@@ -4,6 +4,8 @@ const GRAPH_API_URL = "https://graph.facebook.com/v19.0";
 const GRAPH_VIDEO_API_URL = "https://graph-video.facebook.com/v19.0";
 const DEFAULT_RETRY_INTERVAL_MS = 6000;
 
+type InstagramLogger = Pick<typeof console, "log" | "warn" | "error">;
+
 export interface InstagramPostParams {
   accessToken: string;
   instagramAccountId: string;
@@ -22,7 +24,7 @@ export interface InstagramPostParams {
 
 export interface InstagramPostOptions {
   fetchImpl?: typeof fetch;
-  logger?: Pick<typeof console, "log" | "warn">;
+  logger?: InstagramLogger;
   delayFn?: (ms: number) => Promise<void>;
 }
 
@@ -44,14 +46,18 @@ async function toJson(response: Response): Promise<any> {
   }
 }
 
-function assertSessionPayload(data: any): UploadSessionInfo {
+function assertSessionPayload(logger: InstagramLogger, data: any): UploadSessionInfo {
   const uploadSessionId = data?.upload_session_id ?? data?.id;
   const uploadUrl = data?.upload_url ?? data?.uri;
   if (!uploadSessionId) {
-    throw new Error(`upload_session_id missing in response: ${JSON.stringify(data)}`);
+    const message = `upload_session_id missing in response: ${JSON.stringify(data)}`;
+    logger.error?.(`[instagram] ${message}`);
+    throw new Error(message);
   }
   if (!uploadUrl) {
-    throw new Error(`upload_url missing in response: ${JSON.stringify(data)}`);
+    const message = `upload_url missing in response: ${JSON.stringify(data)}`;
+    logger.error?.(`[instagram] ${message}`);
+    throw new Error(message);
   }
   return {
     uploadSessionId,
@@ -80,7 +86,7 @@ export async function postVideoToInstagram(
     videoDurationSeconds,
   } = params;
   const fetchImpl = options.fetchImpl ?? fetch;
-  const logger = options.logger ?? console;
+  const logger: InstagramLogger = options.logger ?? console;
   const delayFn = options.delayFn ?? delay;
 
   logger.log("[instagram] === Start posting sequence ===");
@@ -89,32 +95,38 @@ export async function postVideoToInstagram(
   }
 
   const startEndpoint = `${GRAPH_VIDEO_API_URL}/${instagramAccountId}/media`;
-  const startParams = new URLSearchParams();
-  startParams.set("access_token", accessToken);
-  startParams.set("media_type", "REELS");
-  startParams.set("upload_phase", "start");
-  startParams.set("upload_type", "resumable");
-  startParams.set("file_size", videoBuffer.length.toString());
+  const startPayload = {
+    access_token: accessToken,
+    media_type: "REELS",
+    upload_phase: "start",
+    upload_type: "resumable",
+    file_size: videoBuffer.length,
+    caption,
+  };
+  if (typeof isAiGenerated === "boolean") {
+    (startPayload as Record<string, any>).is_ai_generated = isAiGenerated;
+  }
 
   logger.log("[instagram] POST %s", startEndpoint);
-  logger.log("[instagram] Request params: %s", startParams.toString());
+  logger.log("[instagram] Request payload:", { ...startPayload, access_token: "***" });
 
   const startResponse = await fetchImpl(startEndpoint, {
     method: "POST",
-    body: startParams,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(startPayload),
   });
   const startData: any = await toJson(startResponse);
   logger.log("[instagram] Response status: %s", startResponse.status);
   logger.log("[instagram] Response body:", startData);
   if (!startResponse.ok) {
-    throw new Error(
-      `Failed to start upload session: ${
-        startData?.error?.message ?? JSON.stringify(startData) ?? "Unknown error"
-      }`,
-    );
+    const message = `Failed to start upload session: ${
+      startData?.error?.message ?? JSON.stringify(startData) ?? "Unknown error"
+    }`;
+    logger.error?.(`[instagram] ${message}`);
+    throw new Error(message);
   }
 
-  const { uploadSessionId, uploadUrl, prePublishVideoId } = assertSessionPayload(startData);
+  const { uploadSessionId, uploadUrl, prePublishVideoId } = assertSessionPayload(logger, startData);
   logger.log("[instagram] Upload session id: %s", uploadSessionId);
   logger.log("[instagram] Upload url: %s", uploadUrl);
 
@@ -274,6 +286,7 @@ outer: while (offset < totalSize) {
         continue;
       }
 
+      logger.error?.(`[instagram] Chunk upload failed permanently: ${errorMessage}`);
       throw new Error(`Instagram video upload failed: ${errorMessage}`);
     }
 
@@ -282,48 +295,52 @@ outer: while (offset < totalSize) {
     }
   }
 
-  const finishParams = new URLSearchParams();
-  finishParams.set("media_type", "REELS");
-  finishParams.set("video_type", "REELS");
-  finishParams.set("clips_subtype", "REELS");
-  finishParams.set("access_token", accessToken);
-  finishParams.set("upload_phase", "finish");
-  finishParams.set("upload_session_id", uploadSessionId);
-  finishParams.set("caption", caption);
+  const finishPayload: Record<string, any> = {
+    access_token: accessToken,
+    upload_phase: "finish",
+    upload_session_id: uploadSessionId,
+    media_type: "REELS",
+    video_type: "REELS",
+    clips_subtype: "REELS",
+    caption,
+    video_url: uploadUrl,
+  };
   if (prePublishVideoId) {
-    finishParams.set("video_id", prePublishVideoId);
+    finishPayload.video_id = prePublishVideoId;
   }
-  finishParams.set("video_url", uploadUrl);
   if (typeof isAiGenerated === "boolean") {
-    finishParams.set("is_ai_generated", isAiGenerated ? "true" : "false");
+    finishPayload.is_ai_generated = isAiGenerated;
   }
-  if (typeof thumbOffsetSeconds === "number") {
-    finishParams.set("thumb_offset", Math.max(0, Math.floor(thumbOffsetSeconds)).toString());
-  } else {
-    finishParams.set("thumb_offset", "0");
-  }
+  finishPayload.thumb_offset =
+    typeof thumbOffsetSeconds === "number" ? Math.max(0, Math.floor(thumbOffsetSeconds)) : 0;
   if (coverUrl) {
-    finishParams.set("cover_url", coverUrl);
+    finishPayload.cover_url = coverUrl;
   }
   if (typeof shareToFeed === "boolean") {
-    finishParams.set("share_to_feed", shareToFeed ? "true" : "false");
+    finishPayload.share_to_feed = shareToFeed;
   }
 
   logger.log("[instagram] Finishing upload session...");
-  logger.log("[instagram] Finish params:", finishParams.toString());
+  logger.log("[instagram] Finish payload:", {
+    ...finishPayload,
+    access_token: "***",
+    caption: caption.slice(0, 120),
+  });
+
   const finishResponse = await fetchImpl(startEndpoint, {
     method: "POST",
-    body: finishParams,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(finishPayload),
   });
   const finishData: any = await toJson(finishResponse);
   logger.log("[instagram] Finish response status: %s", finishResponse.status);
   logger.log("[instagram] Finish response body:", finishData);
   if (!finishResponse.ok) {
-    throw new Error(
-      `Instagram upload finish failed: ${
-        finishData?.error?.message ?? JSON.stringify(finishData) ?? "Unknown error"
-      }`,
-    );
+    const message = `Instagram upload finish failed: ${
+      finishData?.error?.message ?? JSON.stringify(finishData) ?? "Unknown error"
+    }`;
+    logger.error?.(`[instagram] ${message}`);
+    throw new Error(message);
   }
 
   let creationId: string | undefined =
@@ -347,11 +364,11 @@ outer: while (offset < totalSize) {
       logger.log("[instagram] Status response: %s", statusResponse.status);
       logger.log("[instagram] Status body:", statusData);
       if (!statusResponse.ok) {
-        throw new Error(
-          `Instagram status polling failed: ${
-            statusData?.error?.message ?? JSON.stringify(statusData) ?? "Unknown error"
-          }`,
-        );
+        const message = `Instagram status polling failed: ${
+          statusData?.error?.message ?? JSON.stringify(statusData) ?? "Unknown error"
+        }`;
+        logger.error?.(`[instagram] ${message}`);
+        throw new Error(message);
       }
       statusCode = statusData?.status_code ?? statusData?.status ?? statusData?.upload_status;
       creationId = statusData?.id ?? statusData?.video_id ?? statusData?.creation_id ?? creationId;
@@ -363,7 +380,9 @@ outer: while (offset < totalSize) {
         break;
       }
       if (!pendingStatuses.has(upper)) {
-        throw new Error(`Instagram upload session ended with unexpected status: ${statusCode}`);
+        const message = `Instagram upload session ended with unexpected status: ${statusCode}`;
+        logger.error?.(`[instagram] ${message}`);
+        throw new Error(message);
       }
     }
   }
@@ -373,27 +392,31 @@ outer: while (offset < totalSize) {
 
   const publishEndpoint = `${GRAPH_API_URL}/${instagramAccountId}/media_publish`;
   if (!creationId) {
-    throw new Error("Instagram upload finished but creation_id could not be determined.");
+    const message = "Instagram upload finished but creation_id could not be determined.";
+    logger.error?.(`[instagram] ${message}`);
+    throw new Error(message);
   }
 
-  const publishParams = new URLSearchParams();
-  publishParams.set("access_token", accessToken);
-  publishParams.set("creation_id", creationId);
+  const publishBody = {
+    access_token: accessToken,
+    creation_id: creationId,
+  };
 
   logger.log("[instagram] Publishing media container...");
   const publishResponse = await fetchImpl(publishEndpoint, {
     method: "POST",
-    body: publishParams,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(publishBody),
   });
   const publishData: any = await toJson(publishResponse);
   logger.log("[instagram] Publish response status: %s", publishResponse.status);
   logger.log("[instagram] Publish response body:", publishData);
   if (!publishResponse.ok) {
-    throw new Error(
-      `Instagram publish failed: ${
-        publishData?.error?.message ?? JSON.stringify(publishData) ?? "Unknown error"
-      }`,
-    );
+    const message = `Instagram publish failed: ${
+      publishData?.error?.message ?? JSON.stringify(publishData) ?? "Unknown error"
+    }`;
+    logger.error?.(`[instagram] ${message}`);
+    throw new Error(message);
   }
 
   logger.log("[instagram] === Posting sequence finished ===");

@@ -359,7 +359,10 @@ export async function performVideoPosting({
         throw new Error('Downloaded video buffer is empty. Check Google Drive file accessibility.');
       }
       const meta = videoMetaResponse.data as { name?: string; thumbnailLink?: string; videoMediaMetadata?: { width?: number; height?: number; durationMillis?: number; } };
-      const caption = `${title}\n${description}\n${hashtags}`;
+      const captionParts = [title, description, hashtags]
+        .map(part => (part ?? "").trim())
+        .filter(Boolean);
+      const caption = captionParts.join("\n\n");
 
       const publishResult = await postVideoToInstagram({
         accessToken: instagramPageAccessToken,
@@ -380,7 +383,12 @@ export async function performVideoPosting({
       console.log(`[performVideoPosting] Video posted to Instagram: ${title}`, publishResult);
       results.Instagram = { success: true, message: `Successfully posted to Instagram: ${title}` };
     } catch (error: any) {
-      console.error(`[performVideoPosting] Failed to post to Instagram:`, error);
+      console.error(
+        `[performVideoPosting] Failed to post to Instagram: ${error?.message ?? error}`,
+      );
+      if (error?.stack) {
+        console.error(error.stack);
+      }
       results.Instagram = { success: false, message: 'Failed to post to Instagram.', error: error.message };
     }
   }
