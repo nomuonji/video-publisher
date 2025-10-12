@@ -17,7 +17,16 @@ interface ReplayArtifact {
   };
 }
 
-async function downloadFromGoogleDrive(fileId: string): Promise<Buffer> {
+interface DownloadedVideo {
+  buffer: Buffer;
+  thumbnailLink?: string;
+  width?: number;
+  height?: number;
+  durationMs?: number;
+  name?: string;
+}
+
+async function downloadFromGoogleDrive(fileId: string): Promise<DownloadedVideo> {
   const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH;
 
@@ -37,7 +46,9 @@ async function downloadFromGoogleDrive(fileId: string): Promise<Buffer> {
         credentials,
         scopes: ['https://www.googleapis.com/auth/drive.readonly'],
       });
-      const drive = google.drive({ version: 'v3', auth: await auth.getClient() });
+      const client = await auth.getClient();
+      const drive = google.drive({ version: 'v3', auth: client });
+      const meta = await drive.files.get({ fileId, fields: 'name,thumbnailLink,videoMediaMetadata' });
       const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
       const chunks: Buffer[] = [];
       await new Promise<void>((resolve, reject) => {
@@ -45,7 +56,14 @@ async function downloadFromGoogleDrive(fileId: string): Promise<Buffer> {
         response.data.on('end', resolve);
         response.data.on('error', reject);
       });
-      return Buffer.concat(chunks);
+      return {
+        buffer: Buffer.concat(chunks),
+        thumbnailLink: meta.data.thumbnailLink ?? undefined,
+        width: meta.data.videoMediaMetadata?.width ?? undefined,
+        height: meta.data.videoMediaMetadata?.height ?? undefined,
+        durationMs: meta.data.videoMediaMetadata?.durationMillis ?? undefined,
+        name: meta.data.name ?? undefined,
+      };
     }
   } catch (error) {
     console.warn('[replay] Failed to download via Google API, falling back to public download:', error);
@@ -57,7 +75,7 @@ async function downloadFromGoogleDrive(fileId: string): Promise<Buffer> {
     throw new Error(`Failed to download video from Google Drive: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
   }
   const arrayBuffer = await fallbackResponse.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  return { buffer: Buffer.from(arrayBuffer) };
 }
 
 function findLatestReplay(): string | undefined {
@@ -102,8 +120,15 @@ async function main(): Promise<void> {
   console.log('[replay] Video ID:', videoId);
   console.log('[replay] Video size (bytes):', videoBytes);
 
-  const videoBuffer = await downloadFromGoogleDrive(videoId);
+  const downloaded = await downloadFromGoogleDrive(videoId);
+  const videoBuffer = downloaded.buffer;
   console.log('[replay] Downloaded video buffer size:', videoBuffer.length);
+  if (downloaded.width && downloaded.height) {
+    console.log('[replay] Video dimensions:', downloaded.width, 'x', downloaded.height);
+  }
+  if (typeof downloaded.durationMs === 'number') {
+    console.log('[replay] Video duration (ms):', downloaded.durationMs);
+  }
 
   const result = await postVideoToInstagram({
     accessToken,
@@ -113,6 +138,11 @@ async function main(): Promise<void> {
     isAiGenerated,
     videoName,
     videoId,
+    coverUrl: process.env.IG_COVER_URL ?? downloaded.thumbnailLink,
+    thumbOffsetSeconds: process.env.IG_THUMB_OFFSET ? Number(process.env.IG_THUMB_OFFSET) : undefined,
+    videoWidth: downloaded.width,
+    videoHeight: downloaded.height,
+    videoDurationSeconds: typeof downloaded.durationMs === 'number' ? downloaded.durationMs / 1000 : undefined,
   });
 
   console.log('[replay] Instagram publish result:', result);

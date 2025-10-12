@@ -1,0 +1,68 @@
+ Ready! Available at httplocalhost3000
+[performVideoPosting] Starting for concept 1m0pxP-NJu9glAFoQFmHdBbWLxKQTe1mX
+[performVideoPosting] Loaded config for ちんすけ
+[performVideoPosting] Loaded 5 Instagram accounts.
+[performVideoPosting] Selected video to post rendered_clip_002_140-227.mp4 (ID 1r0yjMBwyB5UkmNrxhOUujwPuijJQqE0B) from posted folder.
+[performVideoPosting] Generated Title あなたの彼女
+[performVideoPosting] Generated Description
+
+This video includes altered or synthetic content.
+[performVideoPosting] Generated Hashtags #美女 #sora
+[performVideoPosting] AI Label true
+[performVideoPosting] Posting to Instagram...
+[instagram] === Start posting sequence ===
+[instagram] POST httpsgraph.facebook.comv19.017841476768803816media
+[instagram] Request params access_token=ACCESS_TOKEN&media_type=REELS&upload_phase=start&caption=あなたの彼女
+
+
+This video includes altered or synthetic content.
+#美女 #sora&is_ai_generated=true
+[instagram] Equivalent curl
+curl -X POST httpsgraph.facebook.comv19.017841476768803816media 
+  -F access_token=ACCESS_TOKEN 
+  -F media_type=REELS 
+  -F upload_phase=start 
+  -F caption=CAPTION 
+  -F is_ai_generated=true
+[instagram] Response status 400
+[instagram] Response body {
+  error {
+    message '(#100) The parameter video_url is required',
+    type 'OAuthException',
+    code 100,
+    fbtrace_id 'A34fvKx3sbAPtSkJcgdnQ-F'
+  }
+}
+[performVideoPosting] Failed to post to Instagram Error Instagram session creation failed (#100) The parameter video_url is required
+    at postVideoToInstagram (fileDyouphProjectvideo-publisherservicesinstagramService.ts8115)
+    at processTicksAndRejections (nodeinternalprocesstask_queues955)
+    at async performVideoPosting (fileDyouphProjectvideo-publisherapi_libpostVideo.ts30735)
+    at async handler (fileDyouphProjectvideo-publisherapipostindex.ts1425)
+[performVideoPosting] Video rendered_clip_002_140-227.mp4 is already in 'posted' folder; skipping move.
+api_libpostVideo.ts7863 - error TS18046 'newTokens' is of type 'unknown'.
+
+78     throw new Error(`Failed to refresh TikTok access token ${newTokens.error_description  'Unknown error'}`);
+                                                                 ~~~~~~~~~
+
+api_libpostVideo.ts29655 - error TS18046 'uploadInitData' is of type 'unknown'.
+
+296         throw new Error(`TikTok upload init failed ${uploadInitData.error.message  'Unknown error'}`);
+                                                          ~~~~~~~~~~~~~~
+
+api_libpostVideo.ts29925 - error TS18046 'uploadInitData' is of type 'unknown'.
+
+299       const uploadUrl = uploadInitData.data.upload_url;
+                            ~~~~~~~~~~~~~~
+
+api_libpostVideo.ts30025 - error TS18046 'uploadInitData' is of type 'unknown'.
+
+300       const publishId = uploadInitData.data.publish_id;
+                            ~~~~~~~~~~~~~~
+
+api_libpostVideo.ts32757 - error TS18046 'publishData' is of type 'unknown'.
+
+327         throw new Error(`TikTok video publish failed ${publishData.error.message  'Unknown error'}`);
+                                                            ~~~~~~~~~~~
+
+
+Found 5 errors in the same file, starting at api_libpostVideo.ts78

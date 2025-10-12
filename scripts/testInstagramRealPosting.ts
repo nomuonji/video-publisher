@@ -14,6 +14,10 @@ interface RealTestConfig {
   isAiGenerated?: boolean;
   videoName?: string;
   videoId?: string;
+  coverUrl?: string;
+  videoWidth?: number;
+  videoHeight?: number;
+  videoDurationSeconds?: number;
 }
 
 function resolveCaption(): string {
@@ -29,7 +33,7 @@ function resolveCaption(): string {
   return '';
 }
 
-async function downloadFromGoogleDrive(fileId: string): Promise<{ buffer: Buffer; name?: string; }> {
+async function downloadFromGoogleDrive(fileId: string): Promise<{ buffer: Buffer; name?: string; thumbnailLink?: string; width?: number; height?: number; durationMs?: number; }> {
   const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH;
   let credentialsJson: string | undefined;
@@ -48,8 +52,9 @@ async function downloadFromGoogleDrive(fileId: string): Promise<{ buffer: Buffer
       credentials,
       scopes: ['https://www.googleapis.com/auth/drive.readonly'],
     });
-    const drive = google.drive({ version: 'v3', auth: await auth.getClient() });
-    const meta = await drive.files.get({ fileId, fields: 'name' });
+    const client = await auth.getClient();
+    const drive = google.drive({ version: 'v3', auth: client });
+    const meta = await drive.files.get({ fileId, fields: 'name,thumbnailLink,videoMediaMetadata' });
     const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
@@ -57,7 +62,14 @@ async function downloadFromGoogleDrive(fileId: string): Promise<{ buffer: Buffer
       response.data.on('end', resolve);
       response.data.on('error', reject);
     });
-    return { buffer: Buffer.concat(chunks), name: meta.data.name ?? undefined };
+    return {
+      buffer: Buffer.concat(chunks),
+      name: meta.data.name ?? undefined,
+      thumbnailLink: meta.data.thumbnailLink ?? undefined,
+      width: meta.data.videoMediaMetadata?.width ?? undefined,
+      height: meta.data.videoMediaMetadata?.height ?? undefined,
+      durationMs: meta.data.videoMediaMetadata?.durationMillis ?? undefined,
+    };
   }
 
   // fallback: public download link
@@ -89,6 +101,10 @@ async function buildConfig(): Promise<RealTestConfig> {
   let videoBuffer: Buffer;
   let videoName: string | undefined;
   let videoId: string | undefined;
+  let coverUrl: string | undefined;
+  let videoWidth: number | undefined;
+  let videoHeight: number | undefined;
+  let videoDurationSeconds: number | undefined;
 
   if (videoPath) {
     const video = loadVideoFromFile(videoPath);
@@ -99,6 +115,10 @@ async function buildConfig(): Promise<RealTestConfig> {
     videoBuffer = video.buffer;
     videoName = video.name;
     videoId = driveFileId;
+    coverUrl = video.thumbnailLink;
+    videoWidth = video.width;
+    videoHeight = video.height;
+    videoDurationSeconds = typeof video.durationMs === 'number' ? video.durationMs / 1000 : undefined;
   } else {
     throw new Error('IG_VIDEO_PATH または GOOGLE_DRIVE_FILE_ID のどちらかを指定してください。');
   }
@@ -117,6 +137,10 @@ async function buildConfig(): Promise<RealTestConfig> {
     isAiGenerated,
     videoName,
     videoId,
+    coverUrl,
+    videoWidth,
+    videoHeight,
+    videoDurationSeconds,
   };
 }
 
@@ -135,6 +159,15 @@ async function main(): Promise<void> {
   if (typeof config.isAiGenerated === 'boolean') {
     console.log('[real-test] is_ai_generated:', config.isAiGenerated);
   }
+  if (config.coverUrl) {
+    console.log('[real-test] cover_url:', config.coverUrl);
+  }
+  if (config.videoWidth && config.videoHeight) {
+    console.log('[real-test] video dimensions:', config.videoWidth, 'x', config.videoHeight);
+  }
+  if (typeof config.videoDurationSeconds === 'number') {
+    console.log('[real-test] video duration (s):', config.videoDurationSeconds);
+  }
 
   const result = await postVideoToInstagram({
     accessToken: config.accessToken,
@@ -144,6 +177,11 @@ async function main(): Promise<void> {
     isAiGenerated: config.isAiGenerated,
     videoName: config.videoName,
     videoId: config.videoId,
+    coverUrl: config.coverUrl ?? process.env.IG_COVER_URL,
+    thumbOffsetSeconds: process.env.IG_THUMB_OFFSET ? Number(process.env.IG_THUMB_OFFSET) : undefined,
+    videoWidth: config.videoWidth,
+    videoHeight: config.videoHeight,
+    videoDurationSeconds: config.videoDurationSeconds,
   });
 
   console.log('[real-test] Instagram publish result:', result);
