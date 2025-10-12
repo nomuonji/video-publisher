@@ -66,3 +66,4 @@
 - 最終的な publish 応答: `{ id: "18033280973710576" }` を取得し、実データのリール投稿フローが完結することを確認。
 - 失敗していた要因は finish 呼び出しでの `video_url` 未指定と、最終チャンク周りのヘッダー不足。チャンクごとの `is_last/chunk_sequence_number/chunk_length` 付与と 500ms クールダウン＋リトライで安定化。
 - 今後の再現手順: 上記リプレイスクリプト → ステータスポーリング (`status/status_code`) → `media_publish`。必要に応じて `scripts/testInstagramRealPosting.ts` で本番トークンをセットし統合テストを実施。
+- ローカル実データ用の検証スクリプト（replay/Test用）は不要になったため削除し、`postVideoToInstagram` を利用する本番コードに一本化。ログ (`log.txt`) は空ファイルに戻し、以降は必要最小限のみ出力させる構成とした。
