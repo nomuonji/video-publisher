@@ -77,7 +77,7 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
       />
       
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">Posting Times (Daily, UTC)</label>
+        <label className="block text-sm font-medium text-slate-300 mb-1">Posting Times (Daily, JST)</label>
         <div className="space-y-2">
           {postingTimes.length === 0 && (
             <p className="text-sm text-slate-400 px-1">

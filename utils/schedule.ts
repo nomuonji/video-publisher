@@ -72,7 +72,7 @@ export const ensurePostingTimesFromConfig = (config: Partial<ConceptConfig>): st
 
 export const withNormalizedPostingTimes = (config: ConceptConfig): ConceptConfig => {
   const postingTimes = ensurePostingTimesFromConfig(config);
-  const schedule = postingTimes.length > 0 ? cronFromTime(postingTimes[0]) : config.schedule || cronFromTime(DEFAULT_TIME);
+  const schedule = postingTimes.length > 0 ? cronFromTime(postingTimes[0]) : '';
 
   return {
     ...config,
