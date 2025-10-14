@@ -67,7 +67,7 @@ export const ensurePostingTimesFromConfig = (config: Partial<ConceptConfig>): st
     return derivedFromSchedule;
   }
 
-  return [DEFAULT_TIME];
+  return [];
 };
 
 export const withNormalizedPostingTimes = (config: ConceptConfig): ConceptConfig => {

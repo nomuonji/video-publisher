@@ -1,7 +1,9 @@
 import { performVideoPosting } from '../api/_lib/postVideo.js';
 
-// --- Script entry point (for scheduled runs) ---
-if (require.main === module) {
+import { fileURLToPath } from 'url';
+
+// This check ensures the script only runs when executed directly from the command line.
+if (process.argv[1] && fileURLToPath(import.meta.url).endsWith(process.argv[1])) {
   const conceptId = process.env.CONCEPT_ID;
   const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
@@ -9,6 +11,7 @@ if (require.main === module) {
     console.error('Error: CONCEPT_ID environment variable is not set.');
     process.exit(1);
   }
+  // GOOGLE_SERVICE_ACCOUNT_JSON is needed by the underlying postVideo function
   if (!serviceAccountJson) {
     console.error('Error: GOOGLE_SERVICE_ACCOUNT_JSON environment variable is not set.');
     process.exit(1);

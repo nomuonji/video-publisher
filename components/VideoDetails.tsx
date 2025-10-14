@@ -18,13 +18,12 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
     setConfig(prev => {
       const currentTimes = ensurePostingTimesFromConfig(prev);
       const updated = normalizePostingTimesList(updater(currentTimes));
-      const finalTimes =
-        updated.length > 0 ? updated : ensurePostingTimesFromConfig({ postingTimes: [] } as Partial<ConceptConfig>);
+      const finalTimes = updated;
 
       return {
         ...prev,
         postingTimes: finalTimes,
-        schedule: cronFromTime(finalTimes[0]),
+        schedule: finalTimes.length > 0 ? cronFromTime(finalTimes[0]) : '',
       };
     });
   };
@@ -80,6 +79,11 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-1">Posting Times (Daily, UTC)</label>
         <div className="space-y-2">
+          {postingTimes.length === 0 && (
+            <p className="text-sm text-slate-400 px-1">
+              No automatic posting times are set.
+            </p>
+          )}
           {postingTimes.map((time, index) => (
             <div key={`${time}-${index}`} className="flex items-center gap-3">
               <input
@@ -88,7 +92,7 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
                 onChange={(e) => handlePostingTimeChange(index, e.target.value)}
                 className="w-32 bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
               />
-              {postingTimes.length > 1 && (
+              {postingTimes.length > 0 && (
                 <button
                   type="button"
                   onClick={() => handleRemovePostingTime(index)}

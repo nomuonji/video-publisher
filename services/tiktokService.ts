@@ -1,4 +1,3 @@
-
 import fetch from 'node-fetch';
 
 const TIKTOK_API_BASE_URL = 'https://open.tiktokapis.com';
@@ -33,18 +32,33 @@ export async function uploadVideoToTiktok({ accessToken, openId, videoUrl }: Upl
     }
   });
 
-  const response = await fetch(uploadEndpoint, {
-    method: 'POST',
-    headers,
-    body,
-  });
+  console.log('TikTok API Request Details:');
+  console.log('- Endpoint:', uploadEndpoint);
+  console.log('- Headers:', JSON.stringify(headers, null, 2));
+  console.log('- Body:', body);
 
-  const data = await response.json();
+  try {
+    const response = await fetch(uploadEndpoint, {
+      method: 'POST',
+      headers,
+      body,
+    });
 
-  if (data.error.code !== 'ok') {
-    throw new Error(`Failed to initialize video upload: ${data.error.message}`);
+    const data = await response.json();
+
+    if (data.error && data.error.code !== 'ok') {
+      const errorMessage = `TikTok API Error: ${data.error.message} (code: ${data.error.code})`;
+      console.error(errorMessage);
+      console.error('Full error response:', JSON.stringify(data, null, 2));
+      throw new Error(errorMessage);
+    }
+    
+    console.log('TikTok API Success Response:', JSON.stringify(data, null, 2));
+
+    // The video is now being processed by TikTok. The user will be notified to complete the post.
+    return data.data;
+  } catch (error) {
+    console.error('An unexpected error occurred during the TikTok video upload process:', error);
+    throw error;
   }
-
-  // The video is now being processed by TikTok. The user will be notified to complete the post.
-  return data.data;
 }

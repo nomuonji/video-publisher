@@ -5,6 +5,7 @@ import fetch from 'node-fetch';
 import type { ConceptConfig, TikTokTokens, PostResult } from '../../types.js';
 import { withNormalizedPostingTimes } from '../../utils/schedule.js';
 import { postVideoToInstagram } from '../../services/instagramService.js';
+import { infoLog, debugLog, errorLog } from '../../utils/logger.js';
 
 // --- Authentication ---
 function getAuth(serviceAccountJson: string) {
@@ -111,7 +112,7 @@ export async function performVideoPosting({
   targetPlatforms,
   postDetailsOverride,
 }: PerformVideoPostingOptions): Promise<PostResult> {
-  console.log(`[performVideoPosting] Starting for concept: ${conceptId}`);
+  infoLog(`[performVideoPosting] Starting for concept: ${conceptId}`);
   const results: PostResult = {};
 
   const auth = getAuth(serviceAccountJson);
@@ -124,7 +125,7 @@ export async function performVideoPosting({
   }
   const rawConfig: ConceptConfig = await getFileContent(drive, configFile.id!);
   const config = withNormalizedPostingTimes(rawConfig);
-  console.log(`[performVideoPosting] Loaded config for ${config.name}`);
+  infoLog(`[performVideoPosting] Loaded config for ${config.name}`);
 
   // Instagram accounts
   let instagramAccounts: any[] = [];
@@ -136,9 +137,9 @@ export async function performVideoPosting({
     const instagramAccountsFile = await getFileByName(drive, vStockFolderId, 'instagram_accounts.json');
     if (instagramAccountsFile) {
       instagramAccounts = await getFileContent(drive, instagramAccountsFile.id!);
-      console.log(`[performVideoPosting] Loaded ${instagramAccounts.length} Instagram accounts.`);
+      debugLog(`[performVideoPosting] Loaded ${instagramAccounts.length} Instagram accounts.`);
     } else {
-      console.warn("[performVideoPosting] instagram_accounts.json not found, Instagram posting might fail.");
+      infoLog("[performVideoPosting] instagram_accounts.json not found, Instagram posting might fail.");
     }
   }
 
@@ -170,12 +171,12 @@ export async function performVideoPosting({
   }
 
   if (!videoToPost) {
-    console.log(`[performVideoPosting] No videos found in queue for concept ${config.name}.`);
+    infoLog(`[performVideoPosting] No videos found in queue for concept ${config.name}.`);
     return {}; // No video to post, return empty result
   }
   const originLabel = videoSourceFolderId === queueFolder.id ? 'queue' : 'posted';
   const videoMimeType = videoToPost.mimeType || 'video/mp4';
-  console.log(`[performVideoPosting] Selected video to post: ${videoToPost.name} (ID: ${videoToPost.id}) from ${originLabel} folder.`);
+  infoLog(`[performVideoPosting] Selected video to post: ${videoToPost.name} (ID: ${videoToPost.id}) from ${originLabel} folder.`);
 
   const effectivePostDetails = {
     ...config.postDetails,
@@ -188,16 +189,16 @@ export async function performVideoPosting({
   const hashtags = effectivePostDetails.hashtags;
   const aiLabel = effectivePostDetails.aiLabel;
 
-  console.log(`[performVideoPosting] Generated Title: ${title}`);
-  console.log(`[performVideoPosting] Generated Description: ${description}`);
-  console.log(`[performVideoPosting] Generated Hashtags: ${hashtags}`);
-  console.log(`[performVideoPosting] AI Label: ${aiLabel}`);
+  debugLog(`[performVideoPosting] Generated Title: ${title}`);
+  debugLog(`[performVideoPosting] Generated Description: ${description}`);
+  debugLog(`[performVideoPosting] Generated Hashtags: ${hashtags}`);
+  debugLog(`[performVideoPosting] AI Label: ${aiLabel}`);
 
   const platformsToPost = targetPlatforms || config.platforms;
 
   // --- YouTube Posting ---
   if (platformsToPost.YouTube && config.apiKeys.youtube_refresh_token) {
-    console.log(`[performVideoPosting] Posting to YouTube...`);
+    infoLog(`[performVideoPosting] Posting to YouTube...`);
     try {
       const youtubeAccessToken = await refreshYouTubeAccessToken(config.apiKeys.youtube_refresh_token);
       const youtubeOAuth2Client = new google.auth.OAuth2();
@@ -230,10 +231,10 @@ export async function performVideoPosting({
           body: videoStream,
         },
       });
-      console.log(`[performVideoPosting] Video posted to YouTube: ${title}`);
+      infoLog(`[performVideoPosting] Video posted to YouTube: ${title}`);
       results.YouTube = { success: true, message: `Successfully posted to YouTube: ${title}` };
     } catch (error: any) {
-      console.error(`[performVideoPosting] Failed to post to YouTube:`, error);
+      errorLog(`[performVideoPosting] Failed to post to YouTube:`, error);
       results.YouTube = { success: false, message: 'Failed to post to YouTube.', error: error.message };
     }
   }
@@ -241,11 +242,11 @@ export async function performVideoPosting({
   // --- TikTok Posting ---
   const tiktokTokensConfig = config.apiKeys.tiktok;
   if (platformsToPost.TikTok && tiktokTokensConfig && tiktokTokensConfig.refresh_token) {
-    console.log(`[performVideoPosting] Posting to TikTok...`);
+    infoLog(`[performVideoPosting] Posting to TikTok...`);
     try {
       let currentTikTokTokens: TikTokTokens = { ...tiktokTokensConfig };
       if (typeof currentTikTokTokens.expires_in === 'number' && currentTikTokTokens.expires_in < 3600) {
-        console.log('[performVideoPosting] Refreshing TikTok access token...');
+        debugLog('[performVideoPosting] Refreshing TikTok access token...');
         const oldTikTokTokens = currentTikTokTokens;
         const refreshedTokens = await refreshTikTokAccessToken(currentTikTokTokens);
         currentTikTokTokens = { ...currentTikTokTokens, ...refreshedTokens };
@@ -260,7 +261,7 @@ export async function performVideoPosting({
               body: configContent,
             },
           });
-          console.log('[performVideoPosting] Updated TikTok tokens saved to config.json.');
+          debugLog('[performVideoPosting] Updated TikTok tokens saved to config.json.');
         }
       }
 
@@ -276,22 +277,38 @@ export async function performVideoPosting({
       }
 
       const uploadEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
+      const uploadInitBody = {
+        post_info: {
+          privacy_level: 'SELF_ONLY',
+        },
+        source_info: {
+          source: 'FILE_UPLOAD',
+          video_size: videoByteLength,
+          chunk_size: chunkSize,
+          total_chunk_count: totalChunkCount,
+        },
+      };
+      const uploadInitHeaders = {
+        'Authorization': `Bearer ${currentTikTokTokens.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      debugLog('[performVideoPosting] TikTok Upload Init Request:');
+      debugLog('- Endpoint:', uploadEndpoint);
+      debugLog('- Headers:', JSON.stringify(uploadInitHeaders, null, 2));
+      debugLog('- Body:', JSON.stringify(uploadInitBody, null, 2));
+
       const uploadInitResponse = await fetch(uploadEndpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${currentTikTokTokens.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          source_info: {
-            source: 'FILE_UPLOAD',
-            video_size: videoByteLength,
-            chunk_size: chunkSize,
-            total_chunk_count: totalChunkCount,
-          },
-        }),
+        headers: uploadInitHeaders,
+        body: JSON.stringify(uploadInitBody),
       });
       const uploadInitData = await uploadInitResponse.json();
+
+      debugLog('[performVideoPosting] TikTok Upload Init Response:');
+      debugLog('- Status:', uploadInitResponse.status);
+      debugLog('- Body:', JSON.stringify(uploadInitData, null, 2));
+
       if (!uploadInitResponse.ok) {
         throw new Error(`TikTok upload init failed: ${uploadInitData.error?.message || 'Unknown error'}`);
       }
@@ -299,48 +316,73 @@ export async function performVideoPosting({
       const uploadUrl = uploadInitData.data.upload_url;
       const publishId = uploadInitData.data.publish_id;
 
+      const uploadContentHeaders = {
+        'Content-Range': `bytes 0-${videoByteLength - 1}/${videoByteLength}`,
+        'Content-Type': videoMimeType,
+      };
+
+      debugLog('[performVideoPosting] TikTok Upload Content Request:');
+      debugLog('- URL:', uploadUrl);
+      debugLog('- Headers:', JSON.stringify(uploadContentHeaders, null, 2));
+
       const uploadContentResponse = await fetch(uploadUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Range': `bytes 0-${videoByteLength - 1}/${videoByteLength}`,
-          'Content-Type': videoMimeType,
-        },
+        headers: uploadContentHeaders,
         body: videoBody,
       });
+
+      debugLog('[performVideoPosting] TikTok Upload Content Response:');
+      debugLog('- Status:', uploadContentResponse.status);
+      debugLog('- Status Text:', uploadContentResponse.statusText);
+
+
       if (!uploadContentResponse.ok) {
         throw new Error(`TikTok video content upload failed: ${uploadContentResponse.statusText}`);
       }
 
       const publishEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/status/post/';
+      const publishBody = {
+        publish_id: publishId,
+      };
+      const publishHeaders = {
+        'Authorization': `Bearer ${currentTikTokTokens.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      debugLog('[performVideoPosting] TikTok Publish Request:');
+      debugLog('- Endpoint:', publishEndpoint);
+      debugLog('- Headers:', JSON.stringify(publishHeaders, null, 2));
+      debugLog('- Body:', JSON.stringify(publishBody, null, 2));
+
       const publishResponse = await fetch(publishEndpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${currentTikTokTokens.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          publish_id: publishId,
-        }),
+        headers: publishHeaders,
+        body: JSON.stringify(publishBody),
       });
       const publishData = await publishResponse.json();
+
+      debugLog('[performVideoPosting] TikTok Publish Response:');
+      debugLog('- Status:', publishResponse.status);
+      debugLog('- Body:', JSON.stringify(publishData, null, 2));
+
       if (!publishResponse.ok) {
         throw new Error(`TikTok video publish failed: ${publishData.error?.message || 'Unknown error'}`);
       }
 
-      console.log(`[performVideoPosting] Video posted to TikTok: ${title}`);
+      infoLog(`[performVideoPosting] Video posted to TikTok: ${title}`);
       results.TikTok = { success: true, message: `Successfully posted to TikTok: ${title}` };
     } catch (error: any) {
-      console.error(`[performVideoPosting] Failed to post to TikTok:`, error);
+      errorLog(`[performVideoPosting] Failed to post to TikTok:`, error);
       results.TikTok = { success: false, message: 'Failed to post to TikTok.', error: error.message };
     }
   } else if (platformsToPost.TikTok) {
-    console.warn('[performVideoPosting] Skipping TikTok posting: no connected TikTok account.');
+    infoLog('[performVideoPosting] Skipping TikTok posting: no connected TikTok account.');
     results.TikTok = { success: false, message: 'Skipping TikTok posting: no connected TikTok account.' };
   }
 
   // --- Instagram Posting ---
   if (platformsToPost.Instagram && config.apiKeys.instagram && instagramAccounts.length > 0) {
-    console.log(`[performVideoPosting] Posting to Instagram...`);
+    infoLog(`[performVideoPosting] Posting to Instagram...`);
     try {
       const targetInstagramAccount = instagramAccounts.find(acc => acc.id === config.apiKeys.instagram);
       if (!targetInstagramAccount) {
@@ -380,14 +422,14 @@ export async function performVideoPosting({
           : undefined,
       });
 
-      console.log(`[performVideoPosting] Video posted to Instagram: ${title}`, publishResult);
+      infoLog(`[performVideoPosting] Video posted to Instagram: ${title}`, publishResult);
       results.Instagram = { success: true, message: `Successfully posted to Instagram: ${title}` };
     } catch (error: any) {
-      console.error(
+      errorLog(
         `[performVideoPosting] Failed to post to Instagram: ${error?.message ?? error}`,
       );
       if (error?.stack) {
-        console.error(error.stack);
+        errorLog(error.stack);
       }
       results.Instagram = { success: false, message: 'Failed to post to Instagram.', error: error.message };
     }
@@ -401,9 +443,9 @@ export async function performVideoPosting({
       removeParents: queueFolder.id,
       fields: 'id, parents',
     });
-    console.log(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder.`);
+    infoLog(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder.`);
   } else {
-    console.log(`[performVideoPosting] Video ${videoToPost.name} is already in 'posted' folder; skipping move.`);
+    infoLog(`[performVideoPosting] Video ${videoToPost.name} is already in 'posted' folder; skipping move.`);
   }
 
   return results;

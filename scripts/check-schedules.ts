@@ -1,28 +1,52 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import { spawn } from 'child_process';
 import type { ConceptConfig } from '../types.js';
 import { ensurePostingTimesFromConfig } from '../utils/schedule.js';
+import { infoLog, debugLog, errorLog, isGitHubActions } from '../utils/logger.js';
 
 // --- Authentication ---
 function getAuth() {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON environment variable is not set.');
+  // Prefer the single JSON variable if it exists (for both local and GitHub Actions)
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+      return new JWT({
+        email: serviceAccountKey.client_email,
+        key: serviceAccountKey.private_key,
+        scopes: ['https://www.googleapis.com/auth/drive'],
+      });
+    } catch (e) {
+      throw new Error('Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON. Please ensure it is a valid JSON string.');
+    }
   }
-  const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-  return new JWT({
-    email: serviceAccountKey.client_email,
-    key: serviceAccountKey.private_key,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
+
+  // Fallback for separate EMAIL and KEY variables (legacy local setup)
+  const client_email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const private_key = process.env.GOOGLE_PRIVATE_KEY?.split('\n').join('\n');
+
+  if (client_email && private_key) {
+    return new JWT({
+      email: client_email,
+      key: private_key,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+  }
+
+  throw new Error('Google Service Account credentials are not set. Please check environment variables.');
 }
 
 // --- Main script logic ---
 async function main() {
-  console.log(`Starting schedule check at ${new Date().toISOString()}`);
+  const executionTime = new Date();
+  const jstExecutionTime = new Date(executionTime.getTime() + 9 * 60 * 60 * 1000);
+  const jstTimeString = jstExecutionTime.toISOString().replace('T', ' ').substring(0, 19);
+  infoLog(`Starting schedule check at ${jstTimeString} (JST)`);
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
-  const executionTime = new Date();
   const executedJobs: { name: string; time: string; executedAt: string }[] = [];
 
   // 1. Find the main 'v-stock' folder
@@ -30,25 +54,37 @@ async function main() {
   if (!vStockFolderId) {
     throw new Error("'v-stock' folder not found.");
   }
-  console.log(`Found 'v-stock' folder: ${vStockFolderId}`);
+  debugLog(`Found 'v-stock' folder: ${vStockFolderId}`);
 
   // 2. Get all concept folders
   const conceptFolders = await getSubFolders(drive, vStockFolderId);
-  console.log(`Found ${conceptFolders.length} concept folders.`);
+  debugLog(`Found ${conceptFolders.length} concept folders.`);
+
+  const getDisplayName = (name: string): string => {
+    if (!isGitHubActions) {
+      return name;
+    }
+    return name.length > 2 ? `${name.substring(0, 2)}***` : name;
+  };
 
   // 3. Iterate through each concept and check its schedule
   for (const folder of conceptFolders) {
+    const rawFolderName = folder.name || '';
+    const displayName = getDisplayName(rawFolderName);
+
     const configFile = await getFileByName(drive, folder.id!, 'config.json');
     if (!configFile) {
-      console.log(`- Skipping concept '${folder.name}': config.json not found.`);
+      infoLog(`- Skipping concept '${displayName}': config.json not found.`);
       continue;
     }
 
     const config = (await getFileContent(drive, configFile.id!)) as ConceptConfig;
+    const configDisplayName = getDisplayName(config.name || rawFolderName);
+
     const postingTimes = ensurePostingTimesFromConfig(config);
 
     if (postingTimes.length === 0) {
-      console.log(`- Skipping concept '${config.name || folder.name}': posting times not defined.`);
+      infoLog(`- Skipping concept '${configDisplayName}': posting times not defined.`);
       continue;
     }
 
@@ -58,21 +94,22 @@ async function main() {
       return lastOccurrence >= oneHourAgo && lastOccurrence <= executionTime;
     });
 
-    console.log(`- Checking concept '${config.name || folder.name}': Times '${postingTimes.join(', ')}'.`);
+    infoLog(`- Checking concept '${configDisplayName}': Times '${postingTimes.join(', ')}'.`);
 
     if (!dueTime) {
       continue;
     }
 
-    console.log(`  -> EXECUTING job for concept: ${config.name || folder.name} at ${dueTime}`);
+    infoLog(`  -> EXECUTING job for concept: ${configDisplayName} at ${dueTime}`);
     executedJobs.push({
-      name: config.name || folder.name,
+      name: configDisplayName,
       time: dueTime,
       executedAt: executionTime.toISOString(),
     });
 
     // Trigger post-video.ts script
-    const child = spawn('npx', ['ts-node', 'scripts/post-video.ts'], {
+    const child = spawn('npx', ['tsx', 'scripts/post-video.ts'], {
+      shell: true, // Add this for resolving `npx` in different environments
       env: {
         ...process.env,
         CONCEPT_ID: folder.id!,
@@ -84,27 +121,27 @@ async function main() {
     await new Promise((resolve, reject) => {
       child.on('close', (code) => {
         if (code === 0) {
-          console.log(`  -> Post-video script for ${config.name || folder.name} completed successfully.`);
+          infoLog(`  -> Post-video script for ${configDisplayName} completed successfully.`);
           resolve(null);
         } else {
-          console.error(`  -> Post-video script for ${config.name || folder.name} failed with code ${code}.`);
-          reject(new Error(`Post-video script failed for ${config.name || folder.name}`));
+          errorLog(`  -> Post-video script for ${configDisplayName} failed with code ${code}.`);
+          reject(new Error(`Post-video script failed for ${configDisplayName}`));
         }
       });
       child.on('error', (err) => {
-        console.error(`  -> Failed to start post-video script for ${config.name || folder.name}:`, err);
+        errorLog(`  -> Failed to start post-video script for ${configDisplayName}:`, err);
         reject(err);
       });
     });
   }
 
-  console.log('\n--- Execution Summary ---');
+  infoLog('\n--- Execution Summary ---');
   if (executedJobs.length > 0) {
-    console.log('Successfully executed jobs for scheduled concepts:', executedJobs);
+    infoLog('Successfully executed jobs for scheduled concepts:', executedJobs);
   } else {
-    console.log('No concepts were scheduled to run in the last hour.');
+    infoLog('No concepts were scheduled to run in the last hour.');
   }
-  console.log(`Finished schedule check at ${new Date().toISOString()}`);
+  infoLog(`Finished schedule check at ${new Date().toISOString()}`);
 }
 
 // --- Google Drive Helper Functions ---
@@ -141,20 +178,30 @@ async function getFileContent(drive: any, fileId: string): Promise<any> {
 }
 
 function getMostRecentOccurrence(time: string, reference: Date): Date {
-  const [hourStr, minuteStr] = time.split(':');
-  const hour = Number(hourStr);
-  const minute = Number(minuteStr);
-  const candidate = new Date(
-    Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate(), hour, minute)
-  );
+  const [jstHour, jstMinute] = time.split(':').map(Number);
+
+  // 1. Get today's date parts in JST
+  const jstNow = new Date(reference.getTime() + 9 * 60 * 60 * 1000);
+  const year = jstNow.getUTCFullYear();
+  const month = jstNow.getUTCMonth();
+  const day = jstNow.getUTCDate();
+
+  // 2. Construct today's scheduled time as if it were a UTC date, then convert its timestamp to the actual UTC time
+  const scheduledJstDate = new Date(Date.UTC(year, month, day, jstHour, jstMinute));
+  const scheduledUtcTimestamp = scheduledJstDate.getTime() - 9 * 60 * 60 * 1000;
+  let candidate = new Date(scheduledUtcTimestamp);
+
+  // 3. Check if this candidate time is in the future relative to the current time
   if (candidate > reference) {
-    candidate.setUTCDate(candidate.getUTCDate() - 1);
+    // If it's in the future, the most recent occurrence was 24 hours ago.
+    candidate.setTime(candidate.getTime() - 24 * 60 * 60 * 1000);
   }
+
   return candidate;
 }
 
 // --- Run the script ---
 main().catch(error => {
-  console.error('An unexpected error occurred:', error);
+  errorLog('An unexpected error occurred:', error);
   process.exit(1);
 });
