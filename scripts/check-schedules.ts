@@ -88,10 +88,11 @@ async function main() {
       continue;
     }
 
-    const oneHourAgo = new Date(executionTime.getTime() - 60 * 60 * 1000);
+    // Check for schedules in the last 59 minutes to avoid double-counting on the hour boundary.
+    const checkRangeStart = new Date(executionTime.getTime() - 59 * 60 * 1000);
     const dueTime = postingTimes.find((time: string) => {
       const lastOccurrence = getMostRecentOccurrence(time, executionTime);
-      return lastOccurrence >= oneHourAgo && lastOccurrence <= executionTime;
+      return lastOccurrence >= checkRangeStart && lastOccurrence <= executionTime;
     });
 
     infoLog(`- Checking concept '${configDisplayName}': Times '${postingTimes.join(', ')}'.`);
