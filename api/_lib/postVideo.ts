@@ -435,15 +435,19 @@ export async function performVideoPosting({
     }
   }
 
+  const wasAnyPostSuccessful = Object.values(results).some(result => result.success);
+
   // --- Move video to 'posted' folder ---
-  if (videoSourceFolderId === queueFolder.id) {
+  if (wasAnyPostSuccessful && videoSourceFolderId === queueFolder.id) {
     await drive.files.update({
       fileId: videoToPost.id,
       addParents: postedFolder.id,
       removeParents: queueFolder.id,
       fields: 'id, parents',
     });
-    infoLog(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder.`);
+    infoLog(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder because it was successfully posted to at least one platform.`);
+  } else if (videoSourceFolderId === queueFolder.id) {
+    infoLog(`[performVideoPosting] Video ${videoToPost.name} was not posted to any platform. Keeping it in the 'queue' folder.`);
   } else {
     infoLog(`[performVideoPosting] Video ${videoToPost.name} is already in 'posted' folder; skipping move.`);
   }
