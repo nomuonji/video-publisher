@@ -115,6 +115,8 @@ async function main() {
         ...process.env,
         CONCEPT_ID: folder.id!,
         GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON!,
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
       },
       stdio: 'inherit',
     });
