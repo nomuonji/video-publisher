@@ -1,5 +1,5 @@
 import type { PlatformInfo } from './types.js';
-import { YouTubeIcon, TikTokIcon, InstagramIcon } from './components/icons/PlatformIcons.js';
+import { TikTokIcon, InstagramIcon } from './components/icons/PlatformIcons.js';
 
 export const platforms: PlatformInfo[] = [
     // {
