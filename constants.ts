@@ -2,11 +2,11 @@ import type { PlatformInfo } from './types.js';
 import { YouTubeIcon, TikTokIcon, InstagramIcon } from './components/icons/PlatformIcons.js';
 
 export const platforms: PlatformInfo[] = [
-    {
-        name: 'YouTube',
-        icon: YouTubeIcon,
-        description: 'Best for longer content, tutorials, and vlogs.'
-    },
+    // {
+    //     name: 'YouTube',
+    //     icon: YouTubeIcon,
+    //     description: 'Best for longer content, tutorials, and vlogs.'
+    // },
     {
         name: 'TikTok',
         icon: TikTokIcon,
