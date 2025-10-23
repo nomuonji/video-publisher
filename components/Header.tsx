@@ -1,5 +1,5 @@
 import React from 'react';
-import { MenuIcon } from './icons/MenuIcon';
+import { MenuIcon } from './icons/MenuIcon.js';
 
 interface HeaderProps {
     isSignedIn: boolean;
