@@ -31,7 +31,7 @@ export const PlatformSelector: React.FC<PlatformSelectorProps> = ({ selectedPlat
             }`}
           >
             <div className="flex-shrink-0 mr-4">
-              <platform.icon className="w-8 h-8" />
+              {platform.name !== 'YouTube' && <platform.icon className="w-8 h-8" />}
             </div>
             <div className="flex-grow">
               <h4 className="font-bold text-slate-100">{platform.name}</h4>
