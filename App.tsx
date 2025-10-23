@@ -44,6 +44,7 @@ function App() {
 
     const [isPostingModalOpen, setIsPostingModalOpen] = useState(false);
     const [videoToPost, setVideoToPost] = useState<VideoFile | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const isSignedIn = !!accessToken;
     const service = driveService;
@@ -431,61 +432,81 @@ function App() {
 
     return (
         <div className="bg-slate-900 text-slate-200 min-h-screen flex flex-col">
-            <Header isSignedIn={isSignedIn} onSignIn={handleSignIn} onSignOut={handleSignOut} />
+            <Header isSignedIn={isSignedIn} onSignIn={handleSignIn} onSignOut={handleSignOut} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
             <div className="flex-1 flex max-w-screen-2xl mx-auto w-full overflow-y-hidden">
                 {isSignedIn && (
-                    <aside className="w-72 flex-shrink-0 p-4 sm:p-6 border-r border-slate-700/50 flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-bold text-slate-100">Concepts</h2>
-                            <div className="flex items-center gap-2">
-                                <button onClick={fetchConcepts} title="Refresh Concepts" className="text-slate-400 hover:text-white transition-colors">
-                                    <RefreshIcon className="w-5 h-5" />
-                                </button>
-                                <button onClick={handleCreateConcept} title="New Concept" className="text-slate-400 hover:text-white transition-colors">
-                                    <PlusCircleIcon className="w-6 h-6" />
-                                </button>
+                    <>
+                        {isSidebarOpen && (
+                            <div
+                                className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+                                onClick={() => setIsSidebarOpen(false)}
+                                aria-hidden="true"
+                            ></div>
+                        )}
+                        <aside
+                            className={`
+                                fixed top-0 left-0 h-full z-20
+                                w-72 flex-shrink-0 p-4 sm:p-6 border-r border-slate-700/50 flex flex-col bg-slate-900
+                                transition-transform duration-300 ease-in-out
+                                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                                lg:relative lg:translate-x-0 lg:bg-transparent
+                            `}
+                        >
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-bold text-slate-100">Concepts</h2>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={fetchConcepts} title="Refresh Concepts" className="text-slate-400 hover:text-white transition-colors">
+                                        <RefreshIcon className="w-5 h-5" />
+                                    </button>
+                                    <button onClick={handleCreateConcept} title="New Concept" className="text-slate-400 hover:text-white transition-colors">
+                                        <PlusCircleIcon className="w-6 h-6" />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-2">
-                            {concepts.map(concept => {
-                                const youtubeName =
-                                    concept.config.apiKeys.youtube_channel_name?.trim() ||
-                                    concept.config.apiKeys.youtube_channel_id?.trim() ||
-                                    null;
-                                const tiktokTokens = concept.config.apiKeys.tiktok;
-                                const tiktokName =
-                                    tiktokTokens?.display_name ||
-                                    tiktokTokens?.username ||
-                                    tiktokTokens?.open_id ||
-                                    null;
+                            <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-2">
+                                {concepts.map(concept => {
+                                    const youtubeName =
+                                        concept.config.apiKeys.youtube_channel_name?.trim() ||
+                                        concept.config.apiKeys.youtube_channel_id?.trim() ||
+                                        null;
+                                    const tiktokTokens = concept.config.apiKeys.tiktok;
+                                    const tiktokName =
+                                        tiktokTokens?.display_name ||
+                                        tiktokTokens?.username ||
+                                        tiktokTokens?.open_id ||
+                                        null;
 
-                                return (
-                                    <div
-                                        key={concept.googleDriveFolderId}
-                                        onClick={() => handleSelectConcept(concept.googleDriveFolderId)}
-                                        className={`group flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors ${selectedConceptId === concept.googleDriveFolderId ? 'bg-indigo-900/50' : 'hover:bg-slate-800'}`}
-                                    >
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium truncate">{concept.name}</p>
-                                            <p className="text-xs text-slate-400 truncate">
-                                                YouTube: {youtubeName || 'Not connected'}
-                                            </p>
-                                            <p className="text-xs text-slate-400 truncate">
-                                                TikTok: {tiktokName || 'Not connected'}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteConcept(concept); }}
-                                            className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity flex-shrink-0"
-                                            title="Delete Concept"
+                                    return (
+                                        <div
+                                            key={concept.googleDriveFolderId}
+                                            onClick={() => {
+                                                handleSelectConcept(concept.googleDriveFolderId);
+                                                setIsSidebarOpen(false); // Close sidebar on selection
+                                            }}
+                                            className={`group flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors ${selectedConceptId === concept.googleDriveFolderId ? 'bg-indigo-900/50' : 'hover:bg-slate-800'}`}
                                         >
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </aside>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium truncate">{concept.name}</p>
+                                                <p className="text-xs text-slate-400 truncate">
+                                                    YouTube: {youtubeName || 'Not connected'}
+                                                </p>
+                                                <p className="text-xs text-slate-400 truncate">
+                                                    TikTok: {tiktokName || 'Not connected'}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteConcept(concept); }}
+                                                className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity flex-shrink-0"
+                                                title="Delete Concept"
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </aside>
+                    </>
                 )}
                 {renderContent()}
             </div>
