@@ -43,7 +43,16 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ config, setConfig })
   };
 
   const handleAddPostingTime = () => {
-    updatePostingTimes(times => [...times, '12:00']);
+    updatePostingTimes(times => {
+      if (times.length === 0) {
+        return ['12:00'];
+      }
+      const lastTime = times[times.length - 1];
+      const [hour, minute] = lastTime.split(':').map(Number);
+      const newHour = (hour + 1) % 24;
+      const newTime = `${newHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      return [...times, newTime];
+    });
   };
 
   const handlePostDetailChange = (
