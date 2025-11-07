@@ -167,7 +167,7 @@ export async function performVideoPosting({
       videoSourceFolderId = postedFolder.id!;
     }
   } else {
-    videoToPost = videosInQueue.sort((a: any, b: any) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime())[0];
+    videoToPost = videosInQueue[Math.floor(Math.random() * videosInQueue.length)];
   }
 
   if (!videoToPost) {
