@@ -39,7 +39,11 @@ jobs:
           mkdir -p .github
           printf '%s\n' "$stamp" > .github/keepalive.txt
 
-          if git diff --quiet -- .github/keepalive.txt; then
+          # Stage first: `git diff` ignores untracked files, so checking before
+          # `git add` would treat the very first run as "no change" and exit.
+          git add .github/keepalive.txt
+
+          if git diff --cached --quiet -- .github/keepalive.txt; then
             echo "Timestamp unchanged; nothing to commit."
             exit 0
           fi
