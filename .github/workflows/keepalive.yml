@@ -1,0 +1,51 @@
+name: Repository Keepalive
+
+# GitHub automatically disables scheduled workflows in a public repository once
+# it has seen no repository activity for 60 days. Both the hourly poster
+# (cron.yml) and the daily token check (token-health.yml) are scheduled
+# workflows, so they stop silently when the repository goes quiet -- which is
+# exactly what happened between February and October 2026.
+#
+# This workflow commits a timestamp once a month. A push counts as repository
+# activity, so the 60-day counter never trips and the scheduled workflows keep
+# running.
+#
+# Note this is a workaround, not a guarantee: if this job is delayed or fails
+# for 60 days, the chain breaks. Making the repository private removes the
+# auto-disable rule entirely, and triggering workflow_dispatch from an external
+# scheduler removes the dependency on repository activity altogether.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 00:00 UTC on the 1st of each month
+    - cron: '0 0 1 * *'
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Refresh keepalive timestamp
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p .github
+          printf '%s\n' "$stamp" > .github/keepalive.txt
+
+          if git diff --quiet -- .github/keepalive.txt; then
+            echo "Timestamp unchanged; nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive.txt
+          git commit -m "chore: keepalive ${stamp}"
+          git push
