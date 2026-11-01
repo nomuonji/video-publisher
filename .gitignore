@@ -28,3 +28,6 @@ dist-ssr
 
 .gemini/
 gha-creds-*.json
+
+# Local reauth backups contain refresh tokens; never commit
+config-backup-*.json

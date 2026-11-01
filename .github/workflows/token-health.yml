@@ -1,0 +1,37 @@
+name: YouTube Token Health Check
+
+# Keeps every concept's YouTube refresh token in active use and surfaces a dead
+# token the day it breaks, instead of when a scheduled post fails.
+#
+# Note: GitHub disables scheduled workflows after 60 days without a commit, so
+# this guard is only as reliable as the repository's activity.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 00:00 UTC (09:00 JST)
+    - cron: '0 0 * * *'
+
+jobs:
+  token-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check YouTube refresh tokens
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: npx tsx scripts/check-token-health.ts
