@@ -49,6 +49,11 @@ export interface ConceptConfig {
     hashtags: string;
     aiLabel: boolean;
   };
+  // Catch-up scheduling state written by scripts/check-schedules.ts.
+  // lastPostedSlot is the scheduled slot that was handled (ISO 8601);
+  // lastPostedAt is when the post actually ran.
+  lastPostedSlot?: string;
+  lastPostedAt?: string;
 }
 
 export const DEFAULT_POST_DETAILS: ConceptConfig['postDetails'] = {

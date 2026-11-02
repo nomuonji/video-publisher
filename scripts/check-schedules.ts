@@ -8,6 +8,14 @@ import type { ConceptConfig } from '../types.js';
 import { ensurePostingTimesFromConfig } from '../utils/schedule.js';
 import { infoLog, debugLog, errorLog, isGitHubActions } from '../utils/logger.js';
 
+// Minimum gap between two actual posts for the same concept. Catch-up may want
+// to fire several overdue slots at once; this keeps them from landing together.
+const MIN_POST_INTERVAL_MS = 45 * 60 * 1000;
+
+// DRY_RUN=1 evaluates the schedule and reports what would happen without
+// posting or writing state. Used to verify catch-up behaviour safely.
+const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
+
 // --- Authentication ---
 function getAuth() {
   // Prefer the single JSON variable if it exists (for both local and GitHub Actions)
@@ -88,23 +96,55 @@ async function main() {
       continue;
     }
 
-    // Check for schedules in the last 59 minutes to avoid double-counting on the hour boundary.
-    const checkRangeStart = new Date(executionTime.getTime() - 59 * 60 * 1000);
-    const dueTime = postingTimes.find((time: string) => {
-      const lastOccurrence = getMostRecentOccurrence(time, executionTime);
-      return lastOccurrence >= checkRangeStart && lastOccurrence <= executionTime;
-    });
+    // The scheduler is not reliable: GitHub drops or delays scheduled runs, so a
+    // "did a slot fall in the last 59 minutes" check silently skips any slot the
+    // runner missed. Instead, compare the most recent scheduled slot that has
+    // already started against the last slot this concept actually handled.
+    // A missed slot is therefore picked up late rather than lost.
+    const latestSlot = postingTimes
+      .map((time: string) => getMostRecentOccurrence(time, executionTime))
+      .reduce((a, b) => (a.getTime() >= b.getTime() ? a : b));
 
-    infoLog(`- Checking concept '${configDisplayName}': Times '${postingTimes.join(', ')}'.`);
+    const lastPostedSlot = parseDate(config.lastPostedSlot);
+    const lastPostedAt = parseDate(config.lastPostedAt);
 
-    if (!dueTime) {
+    infoLog(
+      `- Checking concept '${configDisplayName}': Times '${postingTimes.join(', ')}', latest slot ${formatJst(latestSlot)} (JST).`,
+    );
+
+    if (lastPostedSlot && lastPostedSlot.getTime() >= latestSlot.getTime()) {
+      infoLog(`  -> Up to date (last handled slot: ${formatJst(lastPostedSlot)} JST).`);
       continue;
     }
 
-    infoLog(`  -> EXECUTING job for concept: ${configDisplayName} at ${dueTime}`);
+    // Catch-up can fire twice in quick succession when two slots are overdue
+    // (e.g. the 20:00 slot caught at 06:59, then the 07:00 slot one minute
+    // later). Keep a minimum gap between actual posts.
+    if (lastPostedAt && executionTime.getTime() - lastPostedAt.getTime() < MIN_POST_INTERVAL_MS) {
+      infoLog(
+        `  -> Deferring: last post was ${Math.round(
+          (executionTime.getTime() - lastPostedAt.getTime()) / 60000,
+        )} min ago (minimum interval is ${MIN_POST_INTERVAL_MS / 60000} min).`,
+      );
+      continue;
+    }
+
+    const slotLabel = formatJst(latestSlot);
+    infoLog(`  -> EXECUTING job for concept: ${configDisplayName} (slot ${slotLabel} JST)`);
+
+    if (DRY_RUN) {
+      infoLog('  -> DRY_RUN: not posting and not recording the slot.');
+      executedJobs.push({
+        name: configDisplayName,
+        time: slotLabel,
+        executedAt: 'DRY_RUN',
+      });
+      continue;
+    }
+
     executedJobs.push({
       name: configDisplayName,
-      time: dueTime,
+      time: slotLabel,
       executedAt: executionTime.toISOString(),
     });
 
@@ -122,9 +162,23 @@ async function main() {
     });
 
     await new Promise((resolve, reject) => {
-      child.on('close', (code) => {
+      child.on('close', async (code) => {
         if (code === 0) {
           infoLog(`  -> Post-video script for ${configDisplayName} completed successfully.`);
+          // Record the slot we just handled so the next run does not repeat it.
+          // If this write fails the slot is retried, which risks a duplicate
+          // post but never a silently skipped one.
+          try {
+            await updateConfigFields(drive, configFile.id!, {
+              lastPostedSlot: latestSlot.toISOString(),
+              lastPostedAt: new Date().toISOString(),
+            });
+            infoLog(`  -> Recorded slot ${slotLabel} JST as handled.`);
+          } catch (error) {
+            errorLog(`  -> Failed to record the handled slot for ${configDisplayName}:`, error);
+            reject(error);
+            return;
+          }
           resolve(null);
         } else {
           errorLog(`  -> Post-video script for ${configDisplayName} failed with code ${code}.`);
@@ -140,9 +194,12 @@ async function main() {
 
   infoLog('\n--- Execution Summary ---');
   if (executedJobs.length > 0) {
-    infoLog('Successfully executed jobs for scheduled concepts:', executedJobs);
+    infoLog(
+      DRY_RUN ? 'DRY_RUN: concepts that would run:' : 'Successfully executed jobs for scheduled concepts:',
+      executedJobs,
+    );
   } else {
-    infoLog('No concepts were scheduled to run in the last hour.');
+    infoLog('No concepts are due.');
   }
   infoLog(`Finished schedule check at ${new Date().toISOString()}`);
 }
@@ -178,6 +235,31 @@ async function getFileByName(drive: any, parentId: string, name: string): Promis
 async function getFileContent(drive: any, fileId: string): Promise<any> {
     const res = await drive.files.get({ fileId: fileId, alt: 'media' });
     return res.data;
+}
+
+async function updateConfigFields(drive: any, fileId: string, patch: Record<string, unknown>): Promise<void> {
+    const current = await getFileContent(drive, fileId);
+    const config = typeof current === 'string' ? JSON.parse(current) : current;
+    const next = { ...config, ...patch };
+    await drive.files.update({
+        fileId,
+        media: { mimeType: 'application/json', body: JSON.stringify(next, null, 2) },
+    });
+}
+
+function parseDate(value: unknown): Date | null {
+    if (typeof value !== 'string' || value.length === 0) {
+        return null;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatJst(date: Date): string {
+    return new Date(date.getTime() + 9 * 60 * 60 * 1000)
+        .toISOString()
+        .replace('T', ' ')
+        .substring(0, 16);
 }
 
 function getMostRecentOccurrence(time: string, reference: Date): Date {
