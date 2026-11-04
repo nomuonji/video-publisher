@@ -89,6 +89,50 @@ async function getVideosInFolder(drive: any, folderId: string): Promise<any[]> {
   return res.data.files || [];
 }
 
+// Per-video post details.
+//
+// Two sources, later wins:
+//   1. properties.postDetailsOverride on the video file (written by the web UI).
+//      The raw Drive file carries it as a JSON string, so it has to be parsed here;
+//      before this, scheduled posts silently ignored it.
+//   2. A sidecar JSON next to the video with the same base name
+//      (queue/001-selfregi.mp4 + queue/001-selfregi.json). Drive properties are
+//      capped at 124 bytes, too small for a Japanese description, so producers
+//      that upload from scripts (e.g. nomuonji/fuzoku) use the sidecar instead.
+//      Keys: title, description, hashtags, aiLabel (all optional).
+// After a successful post the sidecar is moved to 'posted' with youtubeId/postedAt
+// added, so the producer can read back where the video went.
+function sidecarName(videoName: string): string {
+  return `${videoName.replace(/\.[^.]+$/, '')}.json`;
+}
+
+async function loadVideoPostDetails(drive: any, folderId: string, video: any) {
+  let override: Partial<ConceptConfig['postDetails']> = {};
+  const raw = video.properties?.postDetailsOverride;
+  if (raw) {
+    try {
+      override = { ...override, ...JSON.parse(raw) };
+    } catch (e) {
+      errorLog(`[performVideoPosting] Could not parse postDetailsOverride for ${video.name}:`, e);
+    }
+  }
+  const sidecar = await getFileByName(drive, folderId, sidecarName(video.name || ''));
+  let sidecarData: any = null;
+  if (sidecar) {
+    try {
+      const data = await getFileContent(drive, sidecar.id);
+      sidecarData = typeof data === 'string' ? JSON.parse(data) : data;
+      for (const k of ['title', 'description', 'hashtags', 'aiLabel'] as const) {
+        if (sidecarData?.[k] !== undefined) (override as any)[k] = sidecarData[k];
+      }
+      infoLog(`[performVideoPosting] Using sidecar ${sidecarName(video.name)} for post details.`);
+    } catch (e) {
+      errorLog(`[performVideoPosting] Could not read sidecar for ${video.name}:`, e);
+    }
+  }
+  return { override, sidecar, sidecarData };
+}
+
 const AI_LABEL_MESSAGE = 'This video includes altered or synthetic content.';
 
 function applyAiLabelToDescription(description: string, aiLabel: boolean): string {
@@ -178,11 +222,13 @@ export async function performVideoPosting({
   const videoMimeType = videoToPost.mimeType || 'video/mp4';
   infoLog(`[performVideoPosting] Selected video to post: ${videoToPost.name} (ID: ${videoToPost.id}) from ${originLabel} folder.`);
 
+  const perVideo = await loadVideoPostDetails(drive, videoSourceFolderId, videoToPost);
   const effectivePostDetails = {
     ...config.postDetails,
-    ...(videoToPost.postDetailsOverride ?? {}),
+    ...perVideo.override,
     ...(postDetailsOverride ?? {}),
   };
+  let youtubeVideoId: string | undefined;
 
   const title = effectivePostDetails.title;
   const description = applyAiLabelToDescription(effectivePostDetails.description, effectivePostDetails.aiLabel);
@@ -208,7 +254,7 @@ export async function performVideoPosting({
       const videoFileResponse = await drive.files.get({ fileId: videoToPost.id, alt: 'media' }, { responseType: 'stream' });
       const videoStream = videoFileResponse.data as any;
 
-      await youtube.videos.insert({
+      const inserted = await youtube.videos.insert({
         part: ['snippet', 'status'],
         requestBody: {
           snippet: {
@@ -231,7 +277,8 @@ export async function performVideoPosting({
           body: videoStream,
         },
       });
-      infoLog(`[performVideoPosting] Video posted to YouTube: ${title}`);
+      youtubeVideoId = (inserted as any)?.data?.id;
+      infoLog(`[performVideoPosting] Video posted to YouTube: ${title}${youtubeVideoId ? ` (${youtubeVideoId})` : ''}`);
       results.YouTube = { success: true, message: `Successfully posted to YouTube: ${title}` };
     } catch (error: any) {
       errorLog(`[performVideoPosting] Failed to post to YouTube:`, error);
@@ -446,6 +493,26 @@ export async function performVideoPosting({
       fields: 'id, parents',
     });
     infoLog(`[performVideoPosting] Video ${videoToPost.name} moved to 'posted' folder because it was successfully posted to at least one platform.`);
+    if (perVideo.sidecar) {
+      try {
+        const record = {
+          ...(perVideo.sidecarData ?? {}),
+          ...(youtubeVideoId ? { youtubeId: youtubeVideoId } : {}),
+          postedAt: new Date().toISOString(),
+          results: Object.fromEntries(Object.entries(results).map(([k, v]) => [k, v.success])),
+        };
+        await drive.files.update({
+          fileId: perVideo.sidecar.id,
+          addParents: postedFolder.id,
+          removeParents: queueFolder.id,
+          media: { mimeType: 'application/json', body: JSON.stringify(record, null, 2) },
+          fields: 'id',
+        });
+        infoLog(`[performVideoPosting] Sidecar moved to 'posted' with the post record.`);
+      } catch (e) {
+        errorLog(`[performVideoPosting] Failed to move sidecar for ${videoToPost.name}:`, e);
+      }
+    }
   } else if (videoSourceFolderId === queueFolder.id) {
     infoLog(`[performVideoPosting] Video ${videoToPost.name} was not posted to any platform. Keeping it in the 'queue' folder.`);
   } else {
