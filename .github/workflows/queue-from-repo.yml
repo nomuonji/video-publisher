@@ -1,8 +1,8 @@
 name: Queue From Repo
 
 # Push videos (+ sidecar JSON) under incoming/<concept>/ on a branch named
-# incoming/<anything>. This uploads them to Drive v-stock/<concept>/queue, posts
-# the ones whose sidecar has "postNow", then deletes the branch so videos never
+# incoming/<anything>. This posts them straight to the concept's YouTube channel
+# (refresh token read from Drive config.json), then deletes the branch so videos never
 # reach main. See scripts/queue-from-repo.ts.
 on:
   push:

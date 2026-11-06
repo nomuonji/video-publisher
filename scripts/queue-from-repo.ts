@@ -1,13 +1,14 @@
-// Upload videos committed under incoming/<concept>/ to Drive v-stock/<concept>/queue,
-// together with their sidecar JSON (title, description, hashtags, aiLabel), and
-// optionally post them right away.
+// Post videos committed under incoming/<concept>/ straight to the concept's YouTube
+// channel, using that concept's refresh token from Drive v-stock/<concept>/config.json.
 //
 //   incoming/おもしろ/2026-11-06-atatame.mp4
-//   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "postNow": true}
+//   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false}
 //
-// Producers in other repos (e.g. nomuonji/animation-factory) push such files on an
-// `incoming/<anything>` branch; workflow "Queue From Repo" runs this script and then
-// deletes the branch, so videos never land on main.
+// Why direct: the service account can READ Drive but cannot create files there
+// ("Service Accounts do not have storage quota"), so dropping into queue/ from CI is
+// impossible without a shared drive. Producers (e.g. nomuonji/animation-factory) push such
+// files on an `incoming/<anything>` branch; workflow "Queue From Repo" runs this and then
+// deletes the branch, so videos never land on main. Results go to the job summary.
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
@@ -15,74 +16,92 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
-import { Readable } from 'node:stream';
-import { performVideoPosting } from '../api/_lib/postVideo.js';
 import { infoLog, errorLog } from '../utils/logger.js';
+
+const AI_LABEL_MESSAGE = 'This video includes altered or synthetic content.';
 
 async function findFolder(drive: any, name: string, parent?: string): Promise<string | null> {
   const q = [`mimeType='application/vnd.google-apps.folder'`, `name='${name.replace(/'/g, "\\'")}'`, 'trashed=false'];
   if (parent) q.push(`'${parent}' in parents`);
-  const res = await drive.files.list({ q: q.join(' and '), fields: 'files(id)', pageSize: 1, supportsAllDrives: true, includeItemsFromAllDrives: true });
+  const res = await drive.files.list({ q: q.join(' and '), fields: 'files(id)', pageSize: 1 });
   return res.data.files?.[0]?.id || null;
 }
 
-async function exists(drive: any, folder: string, name: string) {
-  const res = await drive.files.list({ q: `'${folder}' in parents and name='${name.replace(/'/g, "\\'")}' and trashed=false`, fields: 'files(id)', pageSize: 1 });
-  return res.data.files?.[0]?.id || null;
+async function readConfig(drive: any, conceptId: string) {
+  const res = await drive.files.list({ q: `'${conceptId}' in parents and name='config.json' and trashed=false`, fields: 'files(id)', pageSize: 1 });
+  const id = res.data.files?.[0]?.id;
+  if (!id) throw new Error('config.json not found');
+  const got = await drive.files.get({ fileId: id, alt: 'media' }, { responseType: 'text' });
+  return typeof got.data === 'string' ? JSON.parse(got.data) : got.data;
 }
 
 async function main() {
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!json) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is required.');
+  if (!json || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are required.');
   const key = JSON.parse(json);
-  const auth = new JWT({ email: key.client_email, key: key.private_key, scopes: ['https://www.googleapis.com/auth/drive'] });
+  const auth = new JWT({ email: key.client_email, key: key.private_key, scopes: ['https://www.googleapis.com/auth/drive.readonly'] });
   const drive = google.drive({ version: 'v3', auth });
   const root = await findFolder(drive, 'v-stock');
   if (!root) throw new Error("'v-stock' folder not found.");
 
   const base = 'incoming';
-  if (!fs.existsSync(base)) { infoLog('No incoming/ folder.'); return; }
+  if (!fs.existsSync(base)) throw new Error('No incoming/ folder.');
+  const summary: string[] = ['| concept | file | result |', '|---|---|---|'];
   let failures = 0, done = 0;
   for (const concept of fs.readdirSync(base)) {
     const dir = path.join(base, concept);
     if (!fs.statSync(dir).isDirectory()) continue;
     const conceptId = await findFolder(drive, concept, root);
     if (!conceptId) { errorLog(`Concept folder '${concept}' not found under v-stock.`); failures++; continue; }
-    const queue = await findFolder(drive, 'queue', conceptId);
-    if (!queue) { errorLog(`${concept}/queue not found.`); failures++; continue; }
+    const config = await readConfig(drive, conceptId);
+    const refresh = config?.apiKeys?.youtube_refresh_token;
+    if (!refresh) { errorLog(`${concept}: no youtube_refresh_token in config.json`); failures++; continue; }
+    const oauth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+    oauth.setCredentials({ refresh_token: refresh });
+    const youtube = google.youtube({ version: 'v3', auth: oauth });
     for (const file of fs.readdirSync(dir).filter((f) => /\.(mp4|mov)$/i.test(f))) {
       if (!/^[A-Za-z0-9._-]+$/.test(file)) { errorLog(`Unsafe file name: ${file}`); failures++; continue; }
       const sidecarPath = path.join(dir, file.replace(/\.[^.]+$/, '.json'));
-      const meta = fs.existsSync(sidecarPath) ? JSON.parse(fs.readFileSync(sidecarPath, 'utf8')) : {};
-      if (await exists(drive, queue, file)) { errorLog(`${concept}/queue/${file} already exists; skipped.`); failures++; continue; }
-      const { postNow, ...sidecar } = meta;
-      if (Object.keys(sidecar).length) {
-        await drive.files.create({
-          requestBody: { name: path.basename(sidecarPath), parents: [queue], mimeType: 'application/json' },
-          media: { mimeType: 'application/json', body: Readable.from([JSON.stringify(sidecar, null, 2)]) },
-          fields: 'id',
+      const meta = { ...(config.postDetails ?? {}), ...(fs.existsSync(sidecarPath) ? JSON.parse(fs.readFileSync(sidecarPath, 'utf8')) : {}) };
+      if (!meta.title) { errorLog(`${file}: no title`); failures++; continue; }
+      const hashtags: string = meta.hashtags ?? '';
+      let description: string = meta.description ?? '';
+      if (meta.aiLabel && !description.includes(AI_LABEL_MESSAGE)) description = `${description.trim()}\n\n${AI_LABEL_MESSAGE}`;
+      try {
+        const res = await youtube.videos.insert({
+          part: ['snippet', 'status'],
+          requestBody: {
+            snippet: {
+              title: meta.title,
+              description: hashtags ? `${description}\n\n${hashtags}` : description,
+              tags: hashtags.split(/\s+/).filter((t) => t.startsWith('#')).map((t) => t.slice(1)),
+            },
+            status: {
+              privacyStatus: meta.privacy ?? 'public',
+              madeForKids: false,
+              selfDeclaredMadeForKids: false,
+              ...(meta.aiLabel ? { aiGeneratedContent: true } : {}),
+            } as any,
+          },
+          media: { mimeType: 'video/mp4', body: fs.createReadStream(path.join(dir, file)) },
         });
+        const id = (res as any).data?.id;
+        infoLog(`Posted ${concept}/${file} → https://youtube.com/shorts/${id}`);
+        summary.push(`| ${concept} | ${file} | https://youtube.com/shorts/${id} |`);
+        done++;
+      } catch (e: any) {
+        errorLog(`Posting ${file} failed:`, e?.message ?? e);
+        summary.push(`| ${concept} | ${file} | FAILED: ${String(e?.message ?? e).slice(0, 120)} |`);
+        failures++;
       }
-      const up = await drive.files.create({
-        requestBody: { name: file, parents: [queue] },
-        media: { mimeType: 'video/mp4', body: fs.createReadStream(path.join(dir, file)) },
-        fields: 'id',
-      });
-      infoLog(`Queued ${concept}/queue/${file} (${up.data.id})`);
-      if (postNow) {
-        const platforms = typeof postNow === 'string' ? Object.fromEntries(postNow.split(',').map((p: string) => [p.trim(), true])) : { YouTube: true };
-        const results = await performVideoPosting({ conceptId, serviceAccountJson: json, targetVideoId: up.data.id!, targetPlatforms: platforms as any });
-        infoLog('Results:', JSON.stringify(results, null, 2));
-        if (!Object.values(results).some((r: any) => r?.success)) { errorLog(`Posting ${file} failed.`); failures++; continue; }
-      }
-      done++;
     }
   }
-  if (failures) throw new Error(`${failures} item(s) failed, ${done} done.`);
-  if (!done) throw new Error('Nothing was queued.');
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary.join('\n') + '\n');
+  if (failures) throw new Error(`${failures} item(s) failed, ${done} posted.`);
+  if (!done) throw new Error('Nothing was posted.');
 }
 
 main().catch((e) => {
-  errorLog('queue-from-repo failed:', e);
+  errorLog('queue-from-repo failed:', e?.message ?? e);
   process.exit(1);
 });
