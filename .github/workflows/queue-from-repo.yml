@@ -1,0 +1,36 @@
+name: Queue From Repo
+
+# Push videos (+ sidecar JSON) under incoming/<concept>/ on a branch named
+# incoming/<anything>. This uploads them to Drive v-stock/<concept>/queue, posts
+# the ones whose sidecar has "postNow", then deletes the branch so videos never
+# reach main. See scripts/queue-from-repo.ts.
+on:
+  push:
+    branches: ['incoming/**']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: queue-from-repo-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - name: Upload to Drive queue (and post)
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: npx tsx scripts/queue-from-repo.ts
+      - name: Delete the incoming branch
+        if: success()
+        run: git push origin --delete "${GITHUB_REF_NAME}"
