@@ -1,8 +1,7 @@
 name: Buffer Channels
 
 # Read-only check of the BUFFER_API_KEY secret: prints the Buffer organizations and channels
-# (service, name, id). Use the TikTok channel id for BUFFER_TIKTOK_CHANNEL_ID / config.json
-# buffer.tiktokChannelId when the account has more than one TikTok channel.
+# (service, name, id). The name is what a sidecar puts in "tiktokAccount".
 on:
   workflow_dispatch:
 

@@ -2,7 +2,7 @@
 // channel, using that concept's refresh token from Drive v-stock/<concept>/config.json.
 //
 //   incoming/おもしろ/2026-11-06-atatame.mp4
-//   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false, "postNow": "YouTube,TikTok"}
+//   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false, "postNow": "YouTube,TikTok", "tiktokAccount": "oyu295"}
 //
 // postNow picks the platforms ("YouTube", "TikTok", "YouTube,TikTok"); without postNow only YouTube.
 // TikTok goes through Buffer when BUFFER_API_KEY is set (see postTikTokViaBuffer), otherwise
@@ -58,8 +58,9 @@ function wants(meta: any, platform: 'youtube' | 'tiktok'): boolean {
 // Buffer's GraphQL API (https://developers.buffer.com) has no upload endpoint: it pulls the video
 // from a public, stable HTTPS URL at publish time. The video is therefore attached to one
 // long-lived GitHub release of this (public) repository, tag `buffer-media`, and its download URL
-// is handed to Buffer. Channel: config.json buffer.tiktokChannelId, else env BUFFER_TIKTOK_CHANNEL_ID,
-// else the only TikTok channel on the account. Mode: sidecar bufferMode (default addToQueue =
+// is handed to Buffer. Channel: the sidecar's "tiktokAccount" (TikTok user name as shown in Buffer,
+// e.g. "oyu295", or the Buffer channel id), else config.json buffer.tiktokAccount, else the only
+// TikTok channel on the account. Mode: sidecar bufferMode (default addToQueue =
 // the Buffer posting schedule; "customScheduled" + bufferDueAt for a fixed time).
 const BUFFER = 'https://api.buffer.com';
 
@@ -70,23 +71,24 @@ async function buffer(query: string): Promise<any> {
   return j.data;
 }
 
-async function bufferTikTokChannel(config: any): Promise<{ id: string; name: string }> {
-  const want = config?.buffer?.tiktokChannelId || process.env.BUFFER_TIKTOK_CHANNEL_ID;
+async function bufferTikTokChannel(account: string | undefined): Promise<{ id: string; name: string }> {
   const acc = await buffer('query { account { organizations { id } } }');
   const all: any[] = [];
   for (const o of acc?.account?.organizations ?? []) {
     const d = await buffer(`query { channels(input: { organizationId: ${JSON.stringify(o.id)} }) { id name displayName service isDisconnected isLocked } }`);
     all.push(...(d?.channels ?? []));
   }
-  infoLog(`Buffer channels: ${all.map((c) => `${c.service}:${c.displayName ?? c.name}(${c.id})`).join(', ') || 'none'}`);
-  if (want) {
-    const c = all.find((x) => x.id === want);
-    if (!c) throw new Error(`Buffer channel ${want} not found on this account`);
-    return { id: c.id, name: c.displayName ?? c.name };
-  }
-  const tt = all.filter((c) => String(c.service).toLowerCase().includes('tiktok') && !c.isDisconnected && !c.isLocked);
-  if (tt.length !== 1) throw new Error(`found ${tt.length} usable TikTok channels in Buffer; set buffer.tiktokChannelId in config.json or BUFFER_TIKTOK_CHANNEL_ID`);
-  return { id: tt[0].id, name: tt[0].displayName ?? tt[0].name };
+  infoLog(`Buffer channels: ${all.map((c) => `${c.service}:${c.name}${c.displayName && c.displayName !== c.name ? `/${c.displayName}` : ''}(${c.id})`).join(', ') || 'none'}`);
+  const norm = (v: unknown) => String(v ?? '').trim().replace(/^@/, '').toLowerCase();
+  const tt = all.filter((c) => norm(c.service).includes('tiktok'));
+  let pick = tt;
+  if (account) pick = tt.filter((c) => [c.id, c.name, c.displayName].some((v) => norm(v) === norm(account)));
+  if (pick.length !== 1) throw new Error(account
+    ? `TikTok account "${account}" not found in Buffer (TikTok channels: ${tt.map((c) => c.name).join(', ') || 'none'})`
+    : `tiktokAccount is not set in the sidecar and Buffer has ${tt.length} TikTok channels`);
+  const c = pick[0];
+  if (c.isDisconnected || c.isLocked) throw new Error(`Buffer channel ${c.name} is ${c.isDisconnected ? 'disconnected' : 'locked'}`);
+  return { id: c.id, name: c.name ?? c.displayName };
 }
 
 /** Attach the file to the `buffer-media` release and return its public download URL. */
@@ -111,7 +113,7 @@ async function publicVideoUrl(filePath: string, assetName: string): Promise<stri
 }
 
 async function postTikTokViaBuffer(filePath: string, assetName: string, caption: string, config: any, meta: any): Promise<string> {
-  const ch = await bufferTikTokChannel(config);
+  const ch = await bufferTikTokChannel(meta.tiktokAccount ?? config?.buffer?.tiktokAccount);
   const url = await publicVideoUrl(filePath, assetName);
   const mode = meta.bufferMode === 'customScheduled' ? 'customScheduled' : 'addToQueue';
   const due = mode === 'customScheduled' && meta.bufferDueAt ? ` dueAt: ${JSON.stringify(meta.bufferDueAt)}` : '';
