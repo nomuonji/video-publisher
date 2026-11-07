@@ -1,0 +1,44 @@
+name: Buffer Tool
+
+# Maintenance against the Buffer API with the BUFFER_API_KEY secret (see scripts/buffer-tool.ts).
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: schema | query
+        required: true
+        default: schema
+      types:
+        description: comma separated GraphQL type names to print (action=schema)
+        required: false
+        default: ''
+      query:
+        description: GraphQL document (action=query)
+        required: false
+        default: ''
+      variables:
+        description: JSON variables (action=query)
+        required: false
+        default: '{}'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - name: Run
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          ACTION: ${{ inputs.action }}
+          TYPES: ${{ inputs.types }}
+          QUERY: ${{ inputs.query }}
+          VARIABLES: ${{ inputs.variables }}
+        run: npx tsx scripts/buffer-tool.ts
