@@ -51,7 +51,10 @@ async function main() {
     let ok = 0;
     for (const id of ids) {
       try {
-        const d = await q(`mutation($id: PostId!) { editPost(input: { id: $id, mode: ${mode}, schedulingType: automatic }) { __typename ... on PostActionSuccess { post { id status dueAt channel { name } } } ... on MutationError { message } } }`, { id });
+        // editPost validates the whole post, so send its text and media back unchanged
+        const cur = (await q(`query($id: PostId!) { post(input: { id: $id }) { text assets { type source thumbnail } } }`, { id })).post;
+        const assets = (cur?.assets ?? []).map((a: any) => String(a.type).toLowerCase() === 'image' ? { image: { url: a.source } } : { video: { url: a.source, ...(a.thumbnail ? { thumbnailUrl: a.thumbnail } : {}) } });
+        const d = await q(`mutation($id: PostId!, $text: String, $assets: [AssetInput!]) { editPost(input: { id: $id, mode: ${mode}, schedulingType: automatic, text: $text, assets: $assets }) { __typename ... on PostActionSuccess { post { id status dueAt channel { name } } } ... on MutationError { message } } }`, { id, text: cur?.text ?? '', assets });
         const r = d.editPost;
         if (r?.post) { ok++; console.log(`OK ${id} ${r.post.channel.name} ${r.post.status} due ${r.post.dueAt}`); }
         else console.log(`NG ${id} ${r?.__typename}: ${r?.message}`);
