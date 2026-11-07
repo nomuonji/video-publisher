@@ -4,7 +4,9 @@
 //   incoming/おもしろ/2026-11-06-atatame.mp4
 //   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false, "postNow": "YouTube,TikTok"}
 //
-// TikTok (optional): when postNow names TikTok, the video is also sent through the Content
+// postNow picks the platforms ("YouTube", "TikTok", "YouTube,TikTok"); without postNow only YouTube.
+// TikTok goes through Buffer when BUFFER_API_KEY is set (see postTikTokViaBuffer), otherwise
+// TikTok (fallback): the video is sent through the Content
 // Posting API (Direct Post) with the concept's apiKeys.tiktok tokens. Needs the repo secrets
 // TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET. The refreshed tokens are written back to
 // config.json. Privacy is the most public level the creator allows (an unaudited TikTok app
@@ -44,10 +46,80 @@ async function readConfig(drive: any, conceptId: string) {
 
 const TT = 'https://open.tiktokapis.com';
 
-function wantsTikTok(meta: any): boolean {
+/** Platforms named in the sidecar's postNow ("YouTube,TikTok" or an array). No postNow = YouTube only. */
+function wants(meta: any, platform: 'youtube' | 'tiktok'): boolean {
   const v = meta.postNow;
-  const list = Array.isArray(v) ? v : String(v ?? '').split(',');
-  return list.some((x: string) => String(x).trim().toLowerCase() === 'tiktok');
+  if (v === undefined || v === null || v === '') return platform === 'youtube';
+  const list = Array.isArray(v) ? v : String(v).split(',');
+  return list.some((x: string) => String(x).trim().toLowerCase() === platform);
+}
+
+// --- TikTok through Buffer (preferred when BUFFER_API_KEY is set) ---------------------------
+// Buffer's GraphQL API (https://developers.buffer.com) has no upload endpoint: it pulls the video
+// from a public, stable HTTPS URL at publish time. The video is therefore attached to one
+// long-lived GitHub release of this (public) repository, tag `buffer-media`, and its download URL
+// is handed to Buffer. Channel: config.json buffer.tiktokChannelId, else env BUFFER_TIKTOK_CHANNEL_ID,
+// else the only TikTok channel on the account. Mode: sidecar bufferMode (default addToQueue =
+// the Buffer posting schedule; "customScheduled" + bufferDueAt for a fixed time).
+const BUFFER = 'https://api.buffer.com';
+
+async function buffer(query: string): Promise<any> {
+  const r = await fetch(BUFFER, { method: 'POST', headers: { Authorization: `Bearer ${process.env.BUFFER_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok || j.errors?.length) throw new Error(`Buffer ${r.status}: ${(j.errors ?? []).map((e: any) => e.message).join('; ') || r.statusText}`);
+  return j.data;
+}
+
+async function bufferTikTokChannel(config: any): Promise<{ id: string; name: string }> {
+  const want = config?.buffer?.tiktokChannelId || process.env.BUFFER_TIKTOK_CHANNEL_ID;
+  const acc = await buffer('query { account { organizations { id } } }');
+  const all: any[] = [];
+  for (const o of acc?.account?.organizations ?? []) {
+    const d = await buffer(`query { channels(input: { organizationId: ${JSON.stringify(o.id)} }) { id name displayName service isDisconnected isLocked } }`);
+    all.push(...(d?.channels ?? []));
+  }
+  infoLog(`Buffer channels: ${all.map((c) => `${c.service}:${c.displayName ?? c.name}(${c.id})`).join(', ') || 'none'}`);
+  if (want) {
+    const c = all.find((x) => x.id === want);
+    if (!c) throw new Error(`Buffer channel ${want} not found on this account`);
+    return { id: c.id, name: c.displayName ?? c.name };
+  }
+  const tt = all.filter((c) => String(c.service).toLowerCase().includes('tiktok') && !c.isDisconnected && !c.isLocked);
+  if (tt.length !== 1) throw new Error(`found ${tt.length} usable TikTok channels in Buffer; set buffer.tiktokChannelId in config.json or BUFFER_TIKTOK_CHANNEL_ID`);
+  return { id: tt[0].id, name: tt[0].displayName ?? tt[0].name };
+}
+
+/** Attach the file to the `buffer-media` release and return its public download URL. */
+async function publicVideoUrl(filePath: string, assetName: string): Promise<string> {
+  const repo = process.env.GITHUB_REPOSITORY, token = process.env.GITHUB_TOKEN;
+  if (!repo || !token) throw new Error('GITHUB_REPOSITORY / GITHUB_TOKEN are needed to host the video for Buffer');
+  const gh = (url: string, init: any = {}) => fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', ...(init.headers ?? {}) } });
+  let rel: any = await (await gh(`https://api.github.com/repos/${repo}/releases/tags/buffer-media`)).json();
+  if (!rel?.id) {
+    const cr = await gh(`https://api.github.com/repos/${repo}/releases`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag_name: 'buffer-media', name: 'buffer-media', body: 'Videos handed to Buffer by Queue From Repo (Buffer pulls them from these URLs). Do not delete before they are published.', prerelease: true }) });
+    rel = await cr.json();
+    if (!rel?.id) throw new Error(`could not create the buffer-media release: ${cr.status} ${rel?.message ?? ''}`);
+  }
+  const name = assetName.replace(/[^A-Za-z0-9._-]/g, '_');
+  const existing = (rel.assets ?? []).find((a: any) => a.name === name);
+  if (existing) return existing.browser_download_url;
+  const buf = fs.readFileSync(filePath);
+  const up = await gh(`https://uploads.github.com/repos/${repo}/releases/${rel.id}/assets?name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(buf.length) }, body: buf });
+  const a: any = await up.json();
+  if (!a?.browser_download_url) throw new Error(`asset upload failed: ${up.status} ${a?.message ?? ''}`);
+  return a.browser_download_url;
+}
+
+async function postTikTokViaBuffer(filePath: string, assetName: string, caption: string, config: any, meta: any): Promise<string> {
+  const ch = await bufferTikTokChannel(config);
+  const url = await publicVideoUrl(filePath, assetName);
+  const mode = meta.bufferMode === 'customScheduled' ? 'customScheduled' : 'addToQueue';
+  const due = mode === 'customScheduled' && meta.bufferDueAt ? ` dueAt: ${JSON.stringify(meta.bufferDueAt)}` : '';
+  const ai = meta.aiLabel || meta.isAiGenerated ? ' metadata: { tiktok: { isAiGenerated: true } }' : '';
+  const d = await buffer(`mutation { createPost(input: { text: ${JSON.stringify(caption.slice(0, 2200))} channelId: ${JSON.stringify(ch.id)} schedulingType: automatic mode: ${mode}${due}${ai} assets: [{ video: { url: ${JSON.stringify(url)} } }] }) { __typename ... on PostActionSuccess { post { id dueAt } } ... on MutationError { message } } }`);
+  const res = d?.createPost;
+  if (!res?.post) throw new Error(`Buffer createPost: ${res?.message ?? JSON.stringify(res)}`);
+  return `Buffer ${mode} → ${ch.name} (post ${res.post.id}${res.post.dueAt ? `, due ${res.post.dueAt}` : ''}) video ${url}`;
 }
 
 async function ttJson(url: string, token: string, body: unknown) {
@@ -117,9 +189,8 @@ async function main() {
     if (!conceptId) { errorLog(`Concept folder '${concept}' not found under v-stock.`); failures++; continue; }
     const config = await readConfig(drive, conceptId);
     const refresh = config?.apiKeys?.youtube_refresh_token;
-    if (!refresh) { errorLog(`${concept}: no youtube_refresh_token in config.json`); failures++; continue; }
     const oauth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-    oauth.setCredentials({ refresh_token: refresh });
+    if (refresh) oauth.setCredentials({ refresh_token: refresh });
     const youtube = google.youtube({ version: 'v3', auth: oauth });
     for (const file of fs.readdirSync(dir).filter((f) => /\.(mp4|mov)$/i.test(f))) {
       if (!/^[A-Za-z0-9._-]+$/.test(file)) { errorLog(`Unsafe file name: ${file}`); failures++; continue; }
@@ -129,45 +200,61 @@ async function main() {
       const hashtags: string = meta.hashtags ?? '';
       let description: string = meta.description ?? '';
       if (meta.aiLabel && !description.includes(AI_LABEL_MESSAGE)) description = `${description.trim()}\n\n${AI_LABEL_MESSAGE}`;
-      try {
-        const res = await youtube.videos.insert({
-          part: ['snippet', 'status'],
-          requestBody: {
-            snippet: {
-              title: meta.title,
-              description: hashtags ? `${description}\n\n${hashtags}` : description,
-              tags: hashtags.split(/\s+/).filter((t) => t.startsWith('#')).map((t) => t.slice(1)),
+      const filePath = path.join(dir, file);
+
+      if (wants(meta, 'youtube')) {
+        try {
+          if (!refresh) throw new Error(`${concept}: no youtube_refresh_token in config.json`);
+          const res = await youtube.videos.insert({
+            part: ['snippet', 'status'],
+            requestBody: {
+              snippet: {
+                title: meta.title,
+                description: hashtags ? `${description}\n\n${hashtags}` : description,
+                tags: hashtags.split(/\s+/).filter((t) => t.startsWith('#')).map((t) => t.slice(1)),
+              },
+              status: {
+                privacyStatus: meta.privacy ?? 'public',
+                madeForKids: false,
+                selfDeclaredMadeForKids: false,
+                ...(meta.aiLabel ? { aiGeneratedContent: true } : {}),
+              } as any,
             },
-            status: {
-              privacyStatus: meta.privacy ?? 'public',
-              madeForKids: false,
-              selfDeclaredMadeForKids: false,
-              ...(meta.aiLabel ? { aiGeneratedContent: true } : {}),
-            } as any,
-          },
-          media: { mimeType: 'video/mp4', body: fs.createReadStream(path.join(dir, file)) },
-        });
-        const id = (res as any).data?.id;
-        infoLog(`Posted ${concept}/${file} → https://youtube.com/shorts/${id}`);
-        summary.push(`| ${concept} | ${file} | https://youtube.com/shorts/${id} |`);
-        done++;
-        if (wantsTikTok(meta)) {
-          try {
-            if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) throw new Error('TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET secrets are not set');
+            media: { mimeType: 'video/mp4', body: fs.createReadStream(filePath) },
+          });
+          const id = (res as any).data?.id;
+          infoLog(`Posted ${concept}/${file} → https://youtube.com/shorts/${id}`);
+          summary.push(`| ${concept} | ${file} | https://youtube.com/shorts/${id} |`);
+          done++;
+        } catch (e: any) {
+          errorLog(`Posting ${file} failed:`, e?.message ?? e);
+          summary.push(`| ${concept} | ${file} | FAILED: ${String(e?.message ?? e).slice(0, 120)} |`);
+          failures++;
+          continue; // do not send a video to TikTok that failed on YouTube
+        }
+      }
+
+      if (wants(meta, 'tiktok')) {
+        const caption = [meta.tiktokCaption ?? meta.title, hashtags].filter(Boolean).join(' ');
+        const tiktokOnly = !wants(meta, 'youtube');
+        try {
+          let r: string;
+          if (process.env.BUFFER_API_KEY) {
+            r = await postTikTokViaBuffer(filePath, `${concept}-${file}`, caption, config, meta);
+          } else {
+            if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) throw new Error('neither BUFFER_API_KEY nor TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET secrets are set');
             if (!config?.apiKeys?.tiktok?.refresh_token) throw new Error(`${concept}: no TikTok account connected (apiKeys.tiktok in config.json)`);
             const token = await tiktokAccess(drive, conceptId, config);
-            const r = await postTikTok(token, path.join(dir, file), hashtags ? `${meta.title} ${hashtags}` : meta.title);
-            infoLog(`TikTok ${concept}/${file} → ${r}`);
-            summary.push(`| ${concept} | ${file} (TikTok) | ${r} |`);
-          } catch (e: any) {
-            errorLog(`TikTok skipped for ${file}: ${e?.message ?? e}`);
-            summary.push(`| ${concept} | ${file} (TikTok) | NOT POSTED: ${String(e?.message ?? e).slice(0, 120)} |`);
+            r = await postTikTok(token, filePath, caption);
           }
+          infoLog(`TikTok ${concept}/${file} → ${r}`);
+          summary.push(`| ${concept} | ${file} (TikTok) | ${r} |`);
+          if (tiktokOnly) done++;
+        } catch (e: any) {
+          errorLog(`TikTok skipped for ${file}: ${e?.message ?? e}`);
+          summary.push(`| ${concept} | ${file} (TikTok) | NOT POSTED: ${String(e?.message ?? e).slice(0, 160)} |`);
+          if (tiktokOnly) failures++; // only fail the job when TikTok was the only target (no YouTube re-post risk)
         }
-      } catch (e: any) {
-        errorLog(`Posting ${file} failed:`, e?.message ?? e);
-        summary.push(`| ${concept} | ${file} | FAILED: ${String(e?.message ?? e).slice(0, 120)} |`);
-        failures++;
       }
     }
   }
