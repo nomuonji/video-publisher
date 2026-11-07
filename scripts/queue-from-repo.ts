@@ -2,7 +2,14 @@
 // channel, using that concept's refresh token from Drive v-stock/<concept>/config.json.
 //
 //   incoming/おもしろ/2026-11-06-atatame.mp4
-//   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false}
+//   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false, "postNow": "YouTube,TikTok"}
+//
+// TikTok (optional): when postNow names TikTok, the video is also sent through the Content
+// Posting API (Direct Post) with the concept's apiKeys.tiktok tokens. Needs the repo secrets
+// TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET. The refreshed tokens are written back to
+// config.json. Privacy is the most public level the creator allows (an unaudited TikTok app
+// only gets SELF_ONLY). A TikTok problem is reported but never fails the job, so the YouTube
+// post is not repeated by a re-run.
 //
 // Why direct: the service account can READ Drive but cannot create files there
 // ("Service Accounts do not have storage quota"), so dropping into queue/ from CI is
@@ -35,11 +42,66 @@ async function readConfig(drive: any, conceptId: string) {
   return typeof got.data === 'string' ? JSON.parse(got.data) : got.data;
 }
 
+const TT = 'https://open.tiktokapis.com';
+
+function wantsTikTok(meta: any): boolean {
+  const v = meta.postNow;
+  const list = Array.isArray(v) ? v : String(v ?? '').split(',');
+  return list.some((x: string) => String(x).trim().toLowerCase() === 'tiktok');
+}
+
+async function ttJson(url: string, token: string, body: unknown) {
+  const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' }, body: JSON.stringify(body) });
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok || (j.error && j.error.code && j.error.code !== 'ok')) throw new Error(`${url.replace(TT, '')}: ${r.status} ${j.error?.code ?? ''} ${j.error?.message ?? ''}`.trim());
+  return j.data;
+}
+
+/** Refresh the concept's TikTok tokens and write them back to config.json. Returns an access token. */
+async function tiktokAccess(drive: any, conceptId: string, config: any): Promise<string> {
+  const t = config.apiKeys.tiktok;
+  const params = new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY!, client_secret: process.env.TIKTOK_CLIENT_SECRET!, grant_type: 'refresh_token', refresh_token: t.refresh_token });
+  const r = await fetch(`${TT}/v2/oauth/token/`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error(`token refresh failed: ${j.error ?? r.status} ${j.error_description ?? ''}`.trim());
+  config.apiKeys.tiktok = { ...t, ...j };
+  const res = await drive.files.list({ q: `'${conceptId}' in parents and name='config.json' and trashed=false`, fields: 'files(id)', pageSize: 1 });
+  const id = res.data.files?.[0]?.id;
+  try {
+    await drive.files.update({ fileId: id, media: { mimeType: 'application/json', body: JSON.stringify(config, null, 2) } });
+  } catch (e: any) {
+    // the refresh token may have rotated; say so loudly so it can be reconnected before it lapses
+    errorLog(`TikTok tokens refreshed but config.json could not be updated: ${e?.message ?? e}`);
+  }
+  return j.access_token;
+}
+
+async function postTikTok(token: string, file: string, title: string): Promise<string> {
+  const info = await ttJson(`${TT}/v2/post/publish/creator_info/query/`, token, {});
+  const opts: string[] = info?.privacy_level_options ?? [];
+  const privacy = ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'].find((p) => opts.includes(p)) ?? 'SELF_ONLY';
+  const buf = fs.readFileSync(file);
+  const init = await ttJson(`${TT}/v2/post/publish/video/init/`, token, {
+    post_info: { title: title.slice(0, 2200), privacy_level: privacy, disable_comment: false, disable_duet: false, disable_stitch: false, is_aigc: true },
+    source_info: { source: 'FILE_UPLOAD', video_size: buf.length, chunk_size: buf.length, total_chunk_count: 1 },
+  });
+  const put = await fetch(init.upload_url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(buf.length), 'Content-Range': `bytes 0-${buf.length - 1}/${buf.length}` }, body: buf });
+  if (!put.ok) throw new Error(`upload failed: ${put.status} ${put.statusText}`);
+  let status = 'PROCESSING_UPLOAD';
+  for (let i = 0; i < 24 && !/PUBLISH_COMPLETE|FAILED/.test(status); i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    const st = await ttJson(`${TT}/v2/post/publish/status/fetch/`, token, { publish_id: init.publish_id });
+    status = st?.status ?? status;
+    if (status === 'FAILED') throw new Error(`publish failed: ${st?.fail_reason ?? 'unknown'}`);
+  }
+  return `${status} (${privacy}, publish_id ${init.publish_id})`;
+}
+
 async function main() {
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!json || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are required.');
   const key = JSON.parse(json);
-  const auth = new JWT({ email: key.client_email, key: key.private_key, scopes: ['https://www.googleapis.com/auth/drive.readonly'] });
+  const auth = new JWT({ email: key.client_email, key: key.private_key, scopes: ['https://www.googleapis.com/auth/drive'] });
   const drive = google.drive({ version: 'v3', auth });
   const root = await findFolder(drive, 'v-stock');
   if (!root) throw new Error("'v-stock' folder not found.");
@@ -89,6 +151,19 @@ async function main() {
         infoLog(`Posted ${concept}/${file} → https://youtube.com/shorts/${id}`);
         summary.push(`| ${concept} | ${file} | https://youtube.com/shorts/${id} |`);
         done++;
+        if (wantsTikTok(meta)) {
+          try {
+            if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) throw new Error('TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET secrets are not set');
+            if (!config?.apiKeys?.tiktok?.refresh_token) throw new Error(`${concept}: no TikTok account connected (apiKeys.tiktok in config.json)`);
+            const token = await tiktokAccess(drive, conceptId, config);
+            const r = await postTikTok(token, path.join(dir, file), hashtags ? `${meta.title} ${hashtags}` : meta.title);
+            infoLog(`TikTok ${concept}/${file} → ${r}`);
+            summary.push(`| ${concept} | ${file} (TikTok) | ${r} |`);
+          } catch (e: any) {
+            errorLog(`TikTok skipped for ${file}: ${e?.message ?? e}`);
+            summary.push(`| ${concept} | ${file} (TikTok) | NOT POSTED: ${String(e?.message ?? e).slice(0, 120)} |`);
+          }
+        }
       } catch (e: any) {
         errorLog(`Posting ${file} failed:`, e?.message ?? e);
         summary.push(`| ${concept} | ${file} | FAILED: ${String(e?.message ?? e).slice(0, 120)} |`);
