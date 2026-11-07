@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: schema | query
+        description: schema | query | failed | retry | sharenow
         required: true
         default: schema
       types:
@@ -20,6 +20,14 @@ on:
         description: JSON variables (action=query)
         required: false
         default: '{}'
+      ids:
+        description: comma separated Buffer post ids (action=retry / sharenow)
+        required: false
+        default: ''
+      mode:
+        description: addToQueue | shareNext | shareNow (action=retry)
+        required: false
+        default: addToQueue
 
 permissions:
   contents: read
@@ -41,4 +49,6 @@ jobs:
           TYPES: ${{ inputs.types }}
           QUERY: ${{ inputs.query }}
           VARIABLES: ${{ inputs.variables }}
+          IDS: ${{ inputs.ids }}
+          MODE: ${{ inputs.mode }}
         run: npx tsx scripts/buffer-tool.ts
