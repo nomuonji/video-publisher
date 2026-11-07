@@ -60,8 +60,8 @@ function wants(meta: any, platform: 'youtube' | 'tiktok'): boolean {
 // long-lived GitHub release of this (public) repository, tag `buffer-media`, and its download URL
 // is handed to Buffer. Channel: the sidecar's "tiktokAccount" (TikTok user name as shown in Buffer,
 // e.g. "oyu295", or the Buffer channel id), else config.json buffer.tiktokAccount, else the only
-// TikTok channel on the account. Mode: sidecar bufferMode (default addToQueue =
-// the Buffer posting schedule; "customScheduled" + bufferDueAt for a fixed time).
+// TikTok channel on the account. Mode: sidecar bufferMode (default shareNow = publish right away;
+// "addToQueue" = next slot of the Buffer posting schedule; "customScheduled" + bufferDueAt).
 const BUFFER = 'https://api.buffer.com';
 
 async function buffer(query: string): Promise<any> {
@@ -115,7 +115,7 @@ async function publicVideoUrl(filePath: string, assetName: string): Promise<stri
 async function postTikTokViaBuffer(filePath: string, assetName: string, caption: string, config: any, meta: any): Promise<string> {
   const ch = await bufferTikTokChannel(meta.tiktokAccount ?? config?.buffer?.tiktokAccount);
   const url = await publicVideoUrl(filePath, assetName);
-  const mode = meta.bufferMode === 'customScheduled' ? 'customScheduled' : 'addToQueue';
+  const mode = ['customScheduled', 'addToQueue', 'shareNext'].includes(meta.bufferMode) ? meta.bufferMode : 'shareNow';
   const due = mode === 'customScheduled' && meta.bufferDueAt ? ` dueAt: ${JSON.stringify(meta.bufferDueAt)}` : '';
   const ai = meta.aiLabel || meta.isAiGenerated ? ' metadata: { tiktok: { isAiGenerated: true } }' : '';
   const d = await buffer(`mutation { createPost(input: { text: ${JSON.stringify(caption.slice(0, 2200))} channelId: ${JSON.stringify(ch.id)} schedulingType: automatic mode: ${mode}${due}${ai} assets: [{ video: { url: ${JSON.stringify(url)} } }] }) { __typename ... on PostActionSuccess { post { id dueAt } } ... on MutationError { message } } }`);
