@@ -1,0 +1,25 @@
+name: Buffer Channels
+
+# Read-only check of the BUFFER_API_KEY secret: prints the Buffer organizations and channels
+# (service, name, id). Use the TikTok channel id for BUFFER_TIKTOK_CHANNEL_ID / config.json
+# buffer.tiktokChannelId when the account has more than one TikTok channel.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - name: List channels
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+        run: npx tsx scripts/buffer-channels.ts
