@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/12Fr7sZgJ5cm02Lk69tlgPo
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## 他のリポジトリから投稿する
+
+`incoming/<コンセプト>/` に動画と sidecar JSON を置いたブランチを push すると投稿される。手順は [docs/incoming-from-repo.md](docs/incoming-from-repo.md)。
