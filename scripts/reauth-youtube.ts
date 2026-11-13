@@ -107,7 +107,7 @@ async function main() {
   const authUrl = oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent select_account',
-    scope: ['https://www.googleapis.com/auth/youtube'],
+    scope: ['https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/yt-analytics.readonly'],
     state,
   });
   console.log('\nOpen this URL in your browser and approve with the YouTube channel account:\n');

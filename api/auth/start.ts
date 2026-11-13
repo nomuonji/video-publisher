@@ -33,7 +33,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     access_type: 'offline',
     prompt: 'consent select_account',
     scope: [
-      'https://www.googleapis.com/auth/youtube'
+      'https://www.googleapis.com/auth/youtube',
+      // 再生時間・維持率などのインサイト読み取り（fuzoku の tools/analytics.py が使う）
+      'https://www.googleapis.com/auth/yt-analytics.readonly'
     ],
     state: JSON.stringify({ conceptId, accessToken }), // Pass conceptId and accessToken through the state
   });
