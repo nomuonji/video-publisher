@@ -1,0 +1,44 @@
+name: YouTube Metrics
+
+# Read-only YouTube Analytics for videos posted through Queue From Repo (e.g. animation-factory's 3D skits).
+# Uses the concept's refresh token from Drive config.json; the token needs the yt-analytics.readonly scope.
+#   mode=check   verify that the Analytics API answers
+#   mode=video   videos="ID:YYYY-MM-DD:尺秒 ..." -> views / avg view / retention in the publish-day..+2d window
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: check | video
+        required: true
+        default: check
+      concept:
+        description: concept folder name under v-stock
+        required: false
+        default: おもしろ
+      videos:
+        description: 'mode=video: space separated ID:YYYY-MM-DD:尺秒'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - name: Fetch metrics
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MODE: ${{ inputs.mode }}
+          CONCEPT: ${{ inputs.concept }}
+          VIDEOS: ${{ inputs.videos }}
+        run: npx tsx scripts/youtube-metrics.ts
