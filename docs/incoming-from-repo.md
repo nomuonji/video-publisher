@@ -52,3 +52,13 @@ incoming/<コンセプト>/<YYYY-MM-DD>-<id>.json
 - Buffer の投稿が `error`: Buffer Tool を `action=sharenow`, `ids=<post id>` で送り直す（`action=failed` で失敗中の投稿一覧、`action=retry` で本文とメディアを付け直して再送）。
 - Buffer に投稿自体が無い: `postNow: "TikTok"` だけの sidecar を別ブランチ（`incoming/<id>-tiktok`）で push する。
 - 認証切れ（`Invalid Credentials` など）: リポジトリの持ち主がトークンを更新する必要がある。報告して止める。
+
+## 再生データを取る（YouTube Metrics）
+
+投稿した動画の数字は **YouTube Metrics**（`.github/workflows/metrics.yml`、`scripts/youtube-metrics.ts`）を手動実行して読む。
+コンセプトの refresh token（Drive の config.json）で YouTube Analytics API を読むだけで、何も書き込まない。
+token に `yt-analytics.readonly` が要る（無ければアプリの「YouTube認証」で再認証）。
+
+- `mode=check`、`concept=おもしろ`: Analytics API が答えるかの疎通確認。
+- `mode=video`、`concept=おもしろ`、`videos="<YouTubeID>:<公開日 YYYY-MM-DD>:<尺秒> …"`: 公開日〜+2日の窓で、再生数・平均視聴時間/率・登録者増・Shortsフィード経由・維持率（3/5/10/20秒/最後）。
+  公開から3日たっていない動画は取らない。ログに表と `METRICS_JSON {...}` の行が出る。
