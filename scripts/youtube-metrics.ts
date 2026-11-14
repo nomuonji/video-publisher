@@ -3,7 +3,7 @@
 // Needs the yt-analytics.readonly scope on that token (re-auth in the app's "YouTube認証" if missing).
 //
 //   MODE=check                      only verify that the Analytics API answers for the concept's channel
-//   MODE=video  VIDEOS="ID:YYYY-MM-DD:尺秒 ID2:YYYY-MM-DD:尺秒"
+//   MODE=video  VIDEOS="ID:YYYY-MM-DD:尺秒 ID2:YYYY-MM-DD:尺秒"   (尺秒 を 0 にすると YouTube Data API から取る)
 //                                   numbers for each video in the window publishDate .. publishDate+2d
 //                                   (the same "d2" window across videos; videos younger than 3 days are skipped)
 //
@@ -61,6 +61,13 @@ async function main() {
   const oauth2 = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
   oauth2.setCredentials({ refresh_token: await refreshToken() });
   const ana = google.youtubeAnalytics({ version: 'v2', auth: oauth2 });
+  const yt = google.youtube({ version: 'v3', auth: oauth2 });
+  /** Duration in seconds from the Data API, used when the caller passes 0 / "?" as 尺秒. */
+  const durationOf = async (id: string): Promise<number> => {
+    const d = (await yt.videos.list({ part: ['contentDetails'], id: [id] })).data.items?.[0]?.contentDetails?.duration;
+    const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(d || '');
+    return m ? Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0) : 0;
+  };
   const query = async (p: any) => (await ana.reports.query({ ids: 'channel==MINE', ...p })).data;
 
   if (mode === 'check') {
@@ -78,11 +85,12 @@ async function main() {
 
   for (const it of items) {
     const [id, date, durS] = it.split(':');
-    const dur = Number(durS);
+    let dur = Number(durS) || 0;
     const start = date, end = addDays(date, 2);
     if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) { console.log(`- ${it}: 形式が違う（ID:YYYY-MM-DD:尺秒）`); failed++; continue; }
     if (end >= addDays(today, -1)) { console.log(`- ${id} (${date}): 公開から3日たっていない。窓 ${start}〜${end} が未確定なので取らない`); continue; }
     try {
+      if (!dur) { try { dur = await durationOf(id); } catch { /* keep 0: retention stays in raw ratio */ } }
       const f = `video==${id}`;
       const m = await query({ startDate: start, endDate: end, filters: f, metrics: 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained,likes,comments,shares' });
       const r = (m.rows?.[0] ?? []).map(num);
@@ -96,6 +104,7 @@ async function main() {
       try {
         const ret = await query({ startDate: start, endDate: end, filters: f, dimensions: 'elapsedVideoTimeRatio', metrics: 'audienceWatchRatio' });
         const pts = (ret.rows ?? []).map((x: any[]) => [num(x[0]), num(x[1])] as [number, number]).sort((a, b) => a[0] - b[0]);
+        if (pts.length && !(dur > 0)) out.retentionRatioCurve = pts.filter((_, i) => i % 10 === 9).map(([r, w]) => [r, Math.round(w * 1000) / 1000]);
         if (pts.length && dur > 0) {
           const at = (sec: number) => { const ratio = sec / dur; let best = pts[0]; for (const p of pts) if (Math.abs(p[0] - ratio) < Math.abs(best[0] - ratio)) best = p; return Math.round(best[1] * 1000) / 1000; };
           out.retention = { '3s': at(3), '5s': at(5), '10s': at(10), '20s': at(20), last: pts[pts.length - 1][1] };
