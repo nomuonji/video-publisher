@@ -4,6 +4,8 @@
 //   incoming/おもしろ/2026-11-06-atatame.mp4
 //   incoming/おもしろ/2026-11-06-atatame.json   {"title": "...", "description": "...", "hashtags": "#a #b", "aiLabel": false, "postNow": "YouTube,TikTok", "tiktokAccount": "oyu295"}
 //
+// publishAt (optional ISO 8601 time, e.g. "2026-11-19T04:00:00Z") schedules the release: YouTube is
+// uploaded private with that publishAt, TikTok goes to Buffer as customScheduled with that dueAt.
 // postNow picks the platforms ("YouTube", "TikTok", "YouTube,TikTok"); without postNow only YouTube.
 // TikTok goes through Buffer when BUFFER_API_KEY is set (see postTikTokViaBuffer), otherwise
 // TikTok (fallback): the video is sent through the Content
@@ -115,8 +117,10 @@ async function publicVideoUrl(filePath: string, assetName: string): Promise<stri
 async function postTikTokViaBuffer(filePath: string, assetName: string, caption: string, config: any, meta: any): Promise<string> {
   const ch = await bufferTikTokChannel(meta.tiktokAccount ?? config?.buffer?.tiktokAccount);
   const url = await publicVideoUrl(filePath, assetName);
-  const mode = ['customScheduled', 'addToQueue', 'shareNext'].includes(meta.bufferMode) ? meta.bufferMode : 'shareNow';
-  const due = mode === 'customScheduled' && meta.bufferDueAt ? ` dueAt: ${JSON.stringify(meta.bufferDueAt)}` : '';
+  // publishAt (ISO 8601, in the future) schedules both platforms: TikTok via Buffer customScheduled.
+  const mode = ['customScheduled', 'addToQueue', 'shareNext'].includes(meta.bufferMode) ? meta.bufferMode : meta.publishAt ? 'customScheduled' : 'shareNow';
+  const dueAt = meta.bufferDueAt ?? meta.publishAt;
+  const due = mode === 'customScheduled' && dueAt ? ` dueAt: ${JSON.stringify(dueAt)}` : '';
   const ai = meta.aiLabel || meta.isAiGenerated ? ' metadata: { tiktok: { isAiGenerated: true } }' : '';
   const d = await buffer(`mutation { createPost(input: { text: ${JSON.stringify(caption.slice(0, 2200))} channelId: ${JSON.stringify(ch.id)} schedulingType: automatic mode: ${mode}${due}${ai} assets: [{ video: { url: ${JSON.stringify(url)} } }] }) { __typename ... on PostActionSuccess { post { id dueAt } } ... on MutationError { message } } }`);
   const res = d?.createPost;
@@ -216,7 +220,9 @@ async function main() {
                 tags: hashtags.split(/\s+/).filter((t) => t.startsWith('#')).map((t) => t.slice(1)),
               },
               status: {
-                privacyStatus: meta.privacy ?? 'public',
+                // publishAt = scheduled release: YouTube needs the video private until that time.
+                privacyStatus: meta.publishAt ? 'private' : (meta.privacy ?? 'public'),
+                ...(meta.publishAt ? { publishAt: new Date(meta.publishAt).toISOString() } : {}),
                 madeForKids: false,
                 selfDeclaredMadeForKids: false,
                 ...(meta.aiLabel ? { aiGeneratedContent: true } : {}),

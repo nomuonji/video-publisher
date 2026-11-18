@@ -25,6 +25,7 @@ incoming/<コンセプト>/<YYYY-MM-DD>-<id>.json
 
 - `hashtags` は **1本の文字列**（配列にしない）。description の後ろに付けて投稿される。
 - `postNow`: `"YouTube"`／`"TikTok"`／`"YouTube,TikTok"`。省略すると YouTube だけ。
+- `publishAt`（任意）: 未来の時刻（ISO 8601、例 `"2026-11-19T04:00:00Z"`）。付けると予約投稿になる。YouTube は非公開でアップロードして公開時刻を設定、TikTok は Buffer の customScheduled で同時刻に予約する。省略すると即時投稿。
 - `tiktokAccount`: Buffer のチャンネル名（おもしろは `oyu295`）。
 - VOICEVOX を使った動画は description に `VOICEVOX:<話者>` のクレジットが必須。
 - animation-factory なら `node tools/three/publish-pack.mjs <id> --publisher <このリポジトリ>` がこの2ファイルを書く。
